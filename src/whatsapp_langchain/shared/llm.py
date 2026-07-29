@@ -69,6 +69,7 @@ def create_chat_model(
         "api_key": secret_key,
         "base_url": settings.openrouter_base_url,
         "rate_limiter": rate_limiter,
+        "max_tokens": settings.openrouter_max_tokens,
     }
     if temperature is not None:
         kwargs["temperature"] = temperature

@@ -62,9 +62,13 @@ class Settings(BaseSettings):
     # Todas as chamadas LLM, embeddings e transcrição usam OpenRouter
     openrouter_api_key: SecretStr | None = None
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
-    openrouter_model: str = "x-ai/grok-4.1-fast"
+    openrouter_model: str = "x-ai/grok-4.3"
     # Modelo dedicado ao pré-processamento de mídia (imagem/áudio)
     openrouter_midia_model: str = "google/gemini-2.5-flash-lite"
+    # OpenRouter reserva créditos com base em max_tokens, não no uso real —
+    # sem um teto, o default do modelo (ex: 65536) pode exceder o saldo
+    # disponível mesmo em respostas curtas.
+    openrouter_max_tokens: int = 4096
 
     # --- LLM Rate Limit ---
     llm_rate_limit_requests_per_second: float = 0.5

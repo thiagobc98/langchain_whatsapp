@@ -32,6 +32,7 @@ from .prompts import SYSTEM_PROMPT
 def build_graph(
     checkpointer: BaseCheckpointSaver | None = None,
     store: BaseStore | None = None,
+    enable_memory_tools: bool | None = None,
 ):
     """Constrói o agente rhawk_assistant.
 
@@ -40,7 +41,7 @@ def build_graph(
     - summarize: Sumariza mensagens antigas (custo extra, preserva contexto)
     - none: Sem gerenciamento de contexto
 
-    Se store for fornecido, habilita memória semântica:
+    Se a memória semântica estiver habilitada:
     - Recall automático via middleware (busca memórias antes de cada chamada)
     - Save explícito via tool save_memory (agente decide quando salvar)
 
@@ -49,7 +50,11 @@ def build_graph(
                       None em dev (in-memory), PostgresSaver em prod.
         store: Store para memória semântica cross-thread.
                None desabilita memória, InMemoryStore em dev,
-               AsyncPostgresStore em prod.
+               AsyncPostgresStore em prod. Não deve ser usado sob
+               `langgraph dev`/LangGraph API — a plataforma injeta seu
+               próprio store automaticamente em runtime.
+        enable_memory_tools: Sobrepõe a decisão de habilitar as tools de
+                      memória. Por padrão segue `store is not None`.
 
     Returns:
         CompiledStateGraph: Agente compilado pronto para uso.
@@ -60,8 +65,11 @@ def build_graph(
     # Middleware de contexto baseado em CONTEXT_STRATEGY
     middleware = get_context_middleware()
 
-    # Tools de memória — só disponibiliza quando store existe
-    tools = [save_memory, read_memory] if store else []
+    if enable_memory_tools is None:
+        enable_memory_tools = store is not None
+
+    # Tools de memória — resolvem o store via InjectedStore em runtime
+    tools = [save_memory, read_memory] if enable_memory_tools else []
 
     return create_agent(
         model=model,
