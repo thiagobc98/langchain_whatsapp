@@ -3,8 +3,8 @@ name = "whatsapp-langchain"
 version = "0.1.0"
 requires-python = ">=3.11"
 dependencies = [
-    "langchain==1.2.8",
-    "langgraph==1.0.7",
+    "langchain==1.2.18",
+    "langgraph==1.1.10",
     "langchain-openai==1.1.7",
     "langgraph-checkpoint-postgres==3.0.4",
     "python-dotenv==1.2.1",
