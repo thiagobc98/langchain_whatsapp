@@ -54,3 +54,6 @@ frontend/out/
 
 # Stress testing results
 stress/results_*.csv
+
+# Backups do banco (gerados por scripts/backup_db.sh)
+backups/

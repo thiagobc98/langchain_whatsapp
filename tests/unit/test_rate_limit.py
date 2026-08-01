@@ -1,19 +1,24 @@
-"""Testes do rate limiter in-memory."""
+"""Testes do rate limiter distribuído (Redis)."""
 
 import time
+from unittest.mock import patch
 
+import fakeredis
 import pytest
 from fastapi import HTTPException
 
-from whatsapp_langchain.server.dependencies import check_rate_limit, request_history
+from whatsapp_langchain.server.dependencies import check_rate_limit
 
 
 @pytest.fixture(autouse=True)
-def clear_history():
-    """Limpa o histórico de requisições entre testes."""
-    request_history.clear()
-    yield
-    request_history.clear()
+def fake_redis():
+    """Redis em memória (fakeredis), isolado por teste."""
+    redis = fakeredis.FakeAsyncRedis()
+    with patch(
+        "whatsapp_langchain.server.dependencies.get_redis",
+        return_value=redis,
+    ):
+        yield redis
 
 
 class TestRateLimit:
@@ -28,7 +33,6 @@ class TestRateLimit:
 
     async def test_blocks_over_limit(self, monkeypatch):
         """Bloqueia quando excede o limite."""
-        # Configura limite baixo para teste
         from whatsapp_langchain.shared.config import settings
 
         monkeypatch.setattr(settings, "rate_limit_per_hour", 3)
@@ -55,15 +59,17 @@ class TestRateLimit:
         # Telefone B: ainda pode
         await check_rate_limit("+5522222222222")
 
-    async def test_old_requests_expire(self, monkeypatch):
+    async def test_old_requests_expire(self, monkeypatch, fake_redis):
         """Requisições antigas (>1h) não contam no limite."""
         from whatsapp_langchain.shared.config import settings
 
         monkeypatch.setattr(settings, "rate_limit_per_hour", 2)
 
-        # Simula requisições de 2 horas atrás
+        # Simula requisições de 2 horas atrás direto no sorted set
         old_time = time.time() - 7200
-        request_history["+5511999999999"] = [old_time, old_time]
+        await fake_redis.zadd(
+            "ratelimit:+5511999999999", {"old-1": old_time, "old-2": old_time}
+        )
 
         # Deve permitir novas requisições (as antigas expiraram)
         await check_rate_limit("+5511999999999")

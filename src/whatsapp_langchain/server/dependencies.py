@@ -12,18 +12,16 @@ Uso:
 """
 
 import time
-from collections import defaultdict
+import uuid
 
 import structlog
 from fastapi import HTTPException, Request
 from twilio.request_validator import RequestValidator  # type: ignore[import-untyped]
 
 from whatsapp_langchain.shared.config import settings
+from whatsapp_langchain.shared.redis_client import get_redis
 
 logger = structlog.get_logger()
-
-# Sliding window de requisições por telefone: {phone: [timestamps]}
-request_history: dict[str, list[float]] = defaultdict(list)
 
 
 def build_validation_url(request: Request) -> str:
@@ -98,8 +96,9 @@ async def validate_twilio_signature(request: Request) -> None:
 async def check_rate_limit(phone_number: str) -> None:
     """Verifica rate limit por número de telefone.
 
-    Usa sliding window de 1 hora. Remove timestamps antigos e compara
-    a quantidade de requisições com o limite configurado.
+    Usa sliding window de 1 hora em Redis (sorted set), compartilhado entre
+    todas as réplicas da API. Remove entradas antigas e compara a
+    quantidade de requisições com o limite configurado.
 
     Args:
         phone_number: Número de telefone do remetente.
@@ -107,18 +106,22 @@ async def check_rate_limit(phone_number: str) -> None:
     Raises:
         HTTPException 429: Se o limite foi atingido.
     """
+    redis = await get_redis()
+    key = f"ratelimit:{phone_number}"
     now = time.time()
     one_hour_ago = now - 3600
 
-    # Remove timestamps antigos
-    timestamps = request_history[phone_number]
-    request_history[phone_number] = [t for t in timestamps if t > one_hour_ago]
+    async with redis.pipeline(transaction=True) as pipe:
+        pipe.zremrangebyscore(key, 0, one_hour_ago)
+        pipe.zcard(key)
+        results = await pipe.execute()
+    count = results[1]
 
-    if len(request_history[phone_number]) >= settings.rate_limit_per_hour:
+    if count >= settings.rate_limit_per_hour:
         logger.warning(
             "rate_limit_exceeded",
             phone=phone_number,
-            count=len(request_history[phone_number]),
+            count=count,
             limit=settings.rate_limit_per_hour,
         )
         raise HTTPException(
@@ -126,5 +129,28 @@ async def check_rate_limit(phone_number: str) -> None:
             detail="Rate limit exceeded. Try again later.",
         )
 
-    # Registra nova requisição
-    request_history[phone_number].append(now)
+    async with redis.pipeline(transaction=True) as pipe:
+        pipe.zadd(key, {str(uuid.uuid4()): now})
+        pipe.expire(key, 3600)
+        await pipe.execute()
+
+
+async def require_admin_session(request: Request) -> str:
+    """Exige sessão de admin autenticada via cookie assinado.
+
+    Usado como dependency das rotas administrativas (`/api/*`).
+
+    Args:
+        request: Request HTTP do FastAPI.
+
+    Returns:
+        Username do admin autenticado.
+
+    Raises:
+        HTTPException 401: Se não há sessão válida.
+    """
+    admin_username = request.session.get("admin_username")
+    if not admin_username:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    return admin_username

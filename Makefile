@@ -1,4 +1,4 @@
-.PHONY: help dev setup db migrate api worker frontend up down reset logs lint format format-check fix typecheck check ci test test-x test-v test-live test-media test-demo test-demo-up test-flows clean
+.PHONY: help dev setup db migrate api worker frontend frontend-build up down reset logs backup lint format format-check fix typecheck check ci test test-x test-v test-live test-media test-demo test-demo-up test-flows stress stress-headless clean
 
 # Cores para output
 CYAN := \033[36m
@@ -29,10 +29,12 @@ api: ## Roda a API localmente (fora do Docker)
 worker: ## Roda o Worker localmente (fora do Docker)
 	uv run python -m whatsapp_langchain.worker.main
 
-frontend: ## Admin Panel da Fase 4 (ainda nao implementado nesta branch)
-	@echo "frontend/ ainda nao existe nesta branch."
-	@echo "O Admin Panel sera implementado na Fase 4."
-	@exit 1
+frontend: ## Roda o Admin Panel (Next.js) localmente em modo dev
+	cd frontend && [ -d node_modules ] || npm install
+	cd frontend && npm run dev
+
+frontend-build: ## Builda o Admin Panel para produção
+	cd frontend && npm install && npm run build
 
 ##@ Docker
 up: ## Inicia todos os serviços (API + Worker + DB)
@@ -48,6 +50,9 @@ reset: ## Reseta stack Docker (remove containers/rede/volumes e sobe com build l
 
 logs: ## Mostra logs de todos os serviços
 	docker compose logs -f
+
+backup: ## Dump do banco (pg_dump via docker compose, salvo em backups/)
+	./scripts/backup_db.sh
 
 ##@ Qualidade de Código
 # Estes comandos verificam estilo e tipos, NÃO lógica.
@@ -104,6 +109,14 @@ test-demo-up: ## Sobe stack Docker e roda testes demonstrativos
 
 test-flows: ## Roda testes de fluxo realista (requer stack Docker)
 	uv run pytest tests/integration/test_realistic_flows.py -v -s
+
+##@ Stress Test
+stress: ## Locust em modo UI (http://localhost:8089) contra a stack local
+	uv run --extra stress locust -f tests/stress/locustfile.py --host http://localhost:8000
+
+stress-headless: ## Locust headless: 50 usuários, spawn 5/s, 2min
+	uv run --extra stress locust -f tests/stress/locustfile.py --host http://localhost:8000 \
+		--headless -u 50 -r 5 -t 2m
 
 ##@ Limpeza
 clean: ## Remove arquivos de cache do Python

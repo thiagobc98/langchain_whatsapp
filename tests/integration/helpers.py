@@ -24,6 +24,29 @@ def get_db_url() -> str:
     return os.getenv("DATABASE_URL", DEFAULT_DB_URL)
 
 
+def get_admin_client(timeout: int = 10) -> httpx.Client:
+    """Retorna um httpx.Client autenticado como admin (rotas /api/*).
+
+    Faz login via ADMIN_USERNAME/ADMIN_PASSWORD do ambiente (mesmo .env
+    usado pela stack Docker) e mantém o cookie de sessão para as
+    próximas requisições feitas com o client retornado.
+    """
+    client = httpx.Client(base_url=API_BASE_URL, timeout=timeout)
+    response = client.post(
+        "/api/auth/login",
+        json={
+            "username": os.getenv("ADMIN_USERNAME", "admin"),
+            "password": os.getenv("ADMIN_PASSWORD", ""),
+        },
+    )
+    assert response.status_code == 200, (
+        "Login de admin falhou nos testes E2E — configure ADMIN_USERNAME/"
+        "ADMIN_PASSWORD no .env usado pela stack Docker "
+        f"(status={response.status_code})"
+    )
+    return client
+
+
 def unique_phone(ddd: str = "99") -> str:
     """Gera número de telefone único para isolamento entre testes."""
     return f"+55{ddd}{uuid.uuid4().int % 10**8:08d}"

@@ -55,6 +55,21 @@ class Settings(BaseSettings):
     # --- Rate Limit ---
     rate_limit_per_hour: int = 30
 
+    # --- Redis ---
+    redis_url: str = "redis://localhost:6379/0"
+
+    # --- Frontend ---
+    frontend_origin: str = "http://localhost:3000"
+
+    # --- Admin Auth ---
+    admin_username: str = "admin"
+    admin_password: SecretStr | None = None
+    # Gere um valor forte em produção:
+    # python -c "import secrets;print(secrets.token_hex(32))"
+    session_secret_key: SecretStr = SecretStr("dev-insecure-secret-change-me")
+    session_max_age_seconds: int = 28800
+    session_cookie_secure: bool = False
+
     # --- Debounce ---
     message_buffer_seconds: float = 2.0
 

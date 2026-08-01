@@ -6,8 +6,10 @@ Usa mocking para simular pool e operações de fila.
 
 from unittest.mock import AsyncMock, patch
 
+import fakeredis
 import pytest
 from fastapi.testclient import TestClient
+from pydantic import SecretStr
 
 from whatsapp_langchain import __version__
 from whatsapp_langchain.server.main import app
@@ -17,8 +19,9 @@ client = TestClient(app, raise_server_exceptions=False)
 
 @pytest.fixture(autouse=True)
 def mock_db():
-    """Mock do banco de dados para testes sem PostgreSQL."""
+    """Mock do banco de dados e do Redis para testes sem infra real."""
     mock_pool = AsyncMock()
+    fake_redis = fakeredis.FakeAsyncRedis()
 
     with (
         patch(
@@ -36,8 +39,29 @@ def mock_db():
         patch("whatsapp_langchain.shared.db.get_pool", return_value=mock_pool),
         patch("whatsapp_langchain.shared.db.run_migrations"),
         patch("whatsapp_langchain.shared.db.close_pool"),
+        patch(
+            "whatsapp_langchain.server.dependencies.get_redis",
+            return_value=fake_redis,
+        ),
     ):
         yield mock_pool
+
+
+@pytest.fixture
+def admin_session(monkeypatch):
+    """Configura credenciais de admin e retorna um client autenticado (isolado)."""
+    from whatsapp_langchain.shared.config import settings
+
+    monkeypatch.setattr(settings, "admin_username", "admin")
+    monkeypatch.setattr(settings, "admin_password", SecretStr("test-password"))
+
+    authed_client = TestClient(app, raise_server_exceptions=False)
+    login_response = authed_client.post(
+        "/api/auth/login",
+        json={"username": "admin", "password": "test-password"},
+    )
+    assert login_response.status_code == 200
+    return authed_client
 
 
 class TestHealthCheck:
@@ -152,9 +176,14 @@ class TestWebhookTwilio:
 class TestAdminRoutes:
     """Testes das rotas administrativas."""
 
-    def test_list_agents(self):
-        """Deve listar agentes disponíveis."""
-        response = client.get("/api/agents")
+    def test_list_agents_requires_auth(self):
+        """Sem sessão de admin, deve retornar 401."""
+        response = TestClient(app, raise_server_exceptions=False).get("/api/agents")
+        assert response.status_code == 401
+
+    def test_list_agents(self, admin_session):
+        """Deve listar agentes disponíveis quando autenticado."""
+        response = admin_session.get("/api/agents")
         assert response.status_code == 200
         data = response.json()
         assert "agents" in data

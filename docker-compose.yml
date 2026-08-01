@@ -25,6 +25,15 @@ services:
       interval: 5s
       retries: 5
 
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 5
+
   api:
     build:
       context: .
@@ -34,9 +43,12 @@ services:
     env_file: .env
     environment:
       DATABASE_URL: postgresql://postgres:postgres@db:5432/whatsapp_langchain
+      REDIS_URL: redis://redis:6379/0
       LOG_JSON: "true"
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
 
   worker:
@@ -46,10 +58,25 @@ services:
     env_file: .env
     environment:
       DATABASE_URL: postgresql://postgres:postgres@db:5432/whatsapp_langchain
+      REDIS_URL: redis://redis:6379/0
       LOG_JSON: "true"
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      API_PROXY_TARGET: http://api:8000
+      NEXT_PUBLIC_API_BASE_URL: ""
+    depends_on:
+      - api
 
 volumes:
   postgres_data:

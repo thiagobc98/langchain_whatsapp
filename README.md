@@ -14,7 +14,7 @@ O objetivo deste repositório é ensinar arquitetura de sistemas em volta do age
 
 ## Fase Atual
 
-**Fase 3 concluída no código.**
+**Fase 4 concluída no código.**
 
 Já implementado no código:
 - API FastAPI com webhook Twilio assíncrono (`/webhook/twilio`)
@@ -27,18 +27,16 @@ Já implementado no código:
 - middleware de contexto (`trim`, `summarize`, `none`)
 - tools de memória semântica (`save_memory` e `read_memory`)
 - processamento de mídia (imagem e áudio) via OpenRouter multimodal
-- rate limit por telefone (in-memory)
-- rotas administrativas (`/api/agents`, `/api/chats`, `/api/metrics`)
+- rate limit distribuído por telefone via Redis (sliding window)
+- rotas administrativas (`/api/agents`, `/api/chats`, `/api/metrics`) protegidas por login
+- admin panel (Next.js) em `frontend/`: dashboard, conversas e agentes
 - endpoint síncrono educacional (`/webhook/sync`)
 - validação criptográfica de `X-Twilio-Signature`
 - envio real de resposta via Twilio Messages API
 - typing indicator via Twilio antes do processamento
+- deploy via Docker Compose com proxy reverso (Caddy) e TLS automático
+- stress test com Locust (`tests/stress/`)
 - documentação de sandbox/webhook/túnel com cloudflared
-
-Fase 4 será o fechamento operacional do projeto:
-- frontend/admin panel integrado neste repositório
-- deploy documentado e reprodutível
-- stress testing e hardening final
 
 ## Arquitetura
 
@@ -75,8 +73,15 @@ OPENROUTER_API_KEY=sk-or-v1-...
 
 ```bash
 make up
-# sobe: db + api + worker
+# sobe: db + redis + api + worker + frontend
 ```
+
+### 3. Admin Panel
+
+Acesse `http://localhost:3000/login` e autentique com `ADMIN_USERNAME`/
+`ADMIN_PASSWORD` (configure no `.env`). Sem `make up`, rode o frontend
+isoladamente em modo dev com `make frontend` (requer `make api` e
+`make db` rodando à parte).
 
 ### Acesso ao banco (DBeaver)
 
@@ -94,7 +99,7 @@ Valide saúde da API:
 curl http://localhost:8000/health
 ```
 
-### 3. Teste rápido (endpoint síncrono)
+### 4. Teste rápido (endpoint síncrono)
 
 ```bash
 curl -X POST "http://localhost:8000/webhook/sync?agent=rhawk_assistant" \
@@ -102,7 +107,7 @@ curl -X POST "http://localhost:8000/webhook/sync?agent=rhawk_assistant" \
   -d '{"phone":"+5511999999999","message":"Olá!"}'
 ```
 
-### 4. Teste assíncrono (simulando Twilio)
+### 5. Teste assíncrono (simulando Twilio)
 
 ```bash
 curl -X POST "http://localhost:8000/webhook/twilio?agent=rhawk_assistant" \
@@ -113,12 +118,18 @@ curl -X POST "http://localhost:8000/webhook/twilio?agent=rhawk_assistant" \
   -d "NumMedia=0"
 ```
 
-Acompanhe métricas:
+Acompanhe métricas (rotas `/api/*` exigem sessão de admin — use um cookie
+jar para manter o login entre requisições):
 
 ```bash
-curl http://localhost:8000/api/metrics
-curl http://localhost:8000/api/chats
+curl -c /tmp/cookies.txt -X POST http://localhost:8000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"admin","password":"SUA_SENHA"}'
+curl -b /tmp/cookies.txt http://localhost:8000/api/metrics
+curl -b /tmp/cookies.txt http://localhost:8000/api/chats
 ```
+
+Ou simplesmente use o Admin Panel em `http://localhost:3000`.
 
 ## Estrutura do Projeto
 
@@ -126,12 +137,18 @@ curl http://localhost:8000/api/chats
 whatsapp-langchain/
 ├── src/whatsapp_langchain/
 │   ├── agents/        # Catálogo de agentes, middleware e tools
-│   ├── server/        # API FastAPI (webhooks + admin APIs)
+│   ├── server/        # API FastAPI (webhooks + auth + admin APIs)
 │   ├── worker/        # Loop consumidor da fila e execução dos agentes
-│   └── shared/        # Config, DB, fila, modelos, logging, factory LLM
+│   └── shared/        # Config, DB, Redis, fila, modelos, logging, factory LLM
+├── frontend/           # Admin Panel (Next.js) — dashboard, conversas, agentes
 ├── db/migrations/     # Schema SQL (fila + conversas + vector)
 ├── docs/              # Documentação técnica e onboarding
-└── tests/             # Unit e integração
+├── scripts/            # Scripts operacionais (backup do banco)
+├── tests/
+│   ├── unit/ e integration/  # Testes automatizados
+│   └── stress/                # Stress test (Locust)
+├── Caddyfile           # Proxy reverso / TLS (produção)
+└── docker-compose.prod.yml  # Override de produção (proxy, restart, limites)
 ```
 
 ## Aprendizado (foco em sistemas)
@@ -159,6 +176,7 @@ Para detalhes técnicos:
 make help
 make api
 make worker
+make frontend
 make migrate
 make test
 make test-live
@@ -166,6 +184,8 @@ make check
 make logs
 make reset
 make test-demo
+make backup
+make stress
 ```
 
 ## Roadmap
@@ -173,7 +193,7 @@ make test-demo
 - **Fase 1** concluída: base de agentes + middleware de contexto
 - **Fase 2** concluída: API + Worker + PostgreSQL + observabilidade operacional
 - **Fase 3** concluída: integração Twilio + assinatura real + typing + reforço dos testes de debounce
-- **Fase 4** em aberto: frontend/admin panel + deploy + stress + hardening final
+- **Fase 4** concluída: admin panel (Next.js) + deploy (Docker Compose + Caddy/TLS) + stress test (Locust) + hardening (rate limit distribuído via Redis, auth do admin panel, containers non-root)
 
 ## Licença
 

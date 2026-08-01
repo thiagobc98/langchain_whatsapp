@@ -4,7 +4,7 @@ Este projeto ensina agentes por uma perspectiva de **sistemas**.
 O agente é só uma parte da solução. O valor real está no fluxo completo:
 entrada confiável, processamento assíncrono, persistência, recuperação de falhas e inspeção operacional.
 
-## Estado Atual (Fase 2 concluída)
+## Estado Atual (Fase 4 concluída)
 
 Implementado:
 - API FastAPI com webhook Twilio assíncrono (`POST /webhook/twilio`)
@@ -17,12 +17,13 @@ Implementado:
 - memória semântica orientada a tools (`save_memory` e `read_memory`)
 - processamento de mídia (imagem e áudio) via OpenRouter
 - retry com backoff progressivo e status de falha
-- APIs administrativas para inspeção
-
-Fora do escopo da Fase 2:
-- envio de resposta via API Twilio no worker
+- envio real de resposta via API Twilio no worker
 - validação criptográfica completa da assinatura Twilio
-- frontend/admin panel neste repositório
+- rate limit distribuído via Redis (sliding window, compartilhado entre réplicas)
+- autenticação do admin panel (login + cookie de sessão assinado)
+- APIs administrativas para inspeção, protegidas por sessão de admin
+- Admin Panel (Next.js) em `frontend/`
+- deploy via Docker Compose com proxy reverso (Caddy) e TLS automático
 
 ## Visão de Componentes
 
@@ -161,8 +162,16 @@ Agrupa mensagens enviadas em sequência curta (`MESSAGE_BUFFER_SECONDS`) para re
 
 ### Rate limits
 
-- API: limite por telefone/hora (in-memory)
+- API: limite por telefone/hora, distribuído via Redis (sorted set, sliding
+  window) — compartilhado entre réplicas da API
 - LLM: token bucket por processo (`InMemoryRateLimiter`)
+
+### Autenticação do Admin Panel
+
+- Login via `ADMIN_USERNAME`/`ADMIN_PASSWORD` (`POST /api/auth/login`)
+- Sessão mantida em cookie assinado (`SessionMiddleware`/`itsdangerous`),
+  sem tabela de sessão — stateless
+- Todas as rotas `/api/*` exigem sessão válida (`require_admin_session`)
 
 ### Observabilidade
 
@@ -173,10 +182,11 @@ Logs estruturados com `structlog` em todos os componentes.
 - `GET /health`
 - `POST /webhook/twilio?agent=<id>`
 - `POST /webhook/sync?agent=<id>` (educacional)
-- `GET /api/agents`
-- `GET /api/chats`
-- `GET /api/chats/{phone_number}`
-- `GET /api/metrics`
+- `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/me`
+- `GET /api/agents` (requer sessão de admin)
+- `GET /api/chats` (requer sessão de admin)
+- `GET /api/chats/{phone_number}` (requer sessão de admin)
+- `GET /api/metrics` (requer sessão de admin)
 
 ## Decisões Arquiteturais (didáticas)
 
@@ -186,10 +196,15 @@ Logs estruturados com `structlog` em todos os componentes.
 - Config centralizada: evita divergência de comportamento por módulo.
 - Middleware explícito: torna política de contexto auditável.
 - Memória por tools explícitas: separa contexto transiente (middleware) de memória durável (store).
+- Sessão via cookie assinado (não JWT): um único usuário admin, sem
+  necessidade de refresh/revogação — mais simples e stateless.
+- Roteamento same-origin (rewrites do Next.js em dev, Caddy em produção):
+  mantém o cookie de sessão sempre same-site, evitando complexidade de CORS
+  com credenciais.
 
-## Próximos passos de arquitetura
+## Próximos passos de arquitetura (fora do escopo da Fase 4)
 
-- integrar envio de saída via Twilio no worker
-- validação real da assinatura Twilio com SDK oficial
-- endurecimento para multi-instância (rate limit distribuído)
-- camada de frontend/admin externa a este pacote
+- múltiplas réplicas de `api`/`worker` em produção (rate limit distribuído
+  e pool de conexões já suportam, mas não testado em escala)
+- rotação de `SESSION_SECRET_KEY` sem invalidar sessões ativas
+- alertas automáticos sobre `queue_size`/`failures_today`

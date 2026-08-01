@@ -16,4 +16,8 @@ COPY db/ db/
 # Instala o pacote e dependências de runtime
 RUN uv pip install --system .
 
+# Roda como usuário não-root
+RUN useradd --create-home --shell /bin/bash appuser
+USER appuser
+
 CMD ["python", "-m", "whatsapp_langchain.worker.main"]

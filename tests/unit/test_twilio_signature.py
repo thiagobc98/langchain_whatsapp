@@ -6,6 +6,7 @@ e verifica que o middleware rejeita assinaturas inválidas com 403.
 
 from unittest.mock import AsyncMock, patch
 
+import fakeredis
 import pytest
 from fastapi.testclient import TestClient
 from twilio.request_validator import RequestValidator
@@ -23,6 +24,7 @@ TEST_WEBHOOK_URL = "https://example.com"
 def mock_db():
     """Mock do banco de dados para testes sem PostgreSQL."""
     mock_pool = AsyncMock()
+    fake_redis = fakeredis.FakeAsyncRedis()
     with (
         patch(
             "whatsapp_langchain.server.routes.health.check_db_health",
@@ -39,6 +41,10 @@ def mock_db():
         patch("whatsapp_langchain.shared.db.get_pool", return_value=mock_pool),
         patch("whatsapp_langchain.shared.db.run_migrations"),
         patch("whatsapp_langchain.shared.db.close_pool"),
+        patch(
+            "whatsapp_langchain.server.dependencies.get_redis",
+            return_value=fake_redis,
+        ),
     ):
         yield mock_pool
 

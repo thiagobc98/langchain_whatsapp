@@ -35,6 +35,7 @@ from .helpers import (
     API_BASE_URL,
     clear_thread_checkpoints,
     count_queue_entries,
+    get_admin_client,
     get_db_url,
     query_conversation,
     query_queue_entry,
@@ -77,6 +78,14 @@ def db_url() -> str:
     return url
 
 
+@pytest.fixture(scope="module")
+def admin_client() -> httpx.Client:
+    """Client httpx autenticado como admin, para as rotas /api/*."""
+    client = get_admin_client()
+    yield client
+    client.close()
+
+
 # ============================================================================
 # Cenário 1: Jornada do Novo Usuário
 # ============================================================================
@@ -89,7 +98,9 @@ class TestJornadaNovoUsuario:
     Cada passo é impresso no terminal para facilitar debug em aula.
     """
 
-    def test_novo_usuario_conversa_multi_turno(self, db_url: str) -> None:
+    def test_novo_usuario_conversa_multi_turno(
+        self, db_url: str, admin_client: httpx.Client
+    ) -> None:
         """Maria envia 2 mensagens e verificamos todo o pipeline."""
         phone = unique_phone("11")
         agent = "rhawk_assistant"
@@ -138,7 +149,7 @@ class TestJornadaNovoUsuario:
 
         # --- Passo 3: Verificação via API Admin ---
         print("[7/8] Verificando via GET /api/chats/{phone}...")
-        chat_resp = httpx.get(f"{API_BASE_URL}/api/chats/{phone}", timeout=10)
+        chat_resp = admin_client.get(f"/api/chats/{phone}")
         assert chat_resp.status_code == 200
         chat_data = chat_resp.json()
         messages = chat_data["messages"]
@@ -150,7 +161,7 @@ class TestJornadaNovoUsuario:
         print(f"  ✓ API retornou {len(done_msgs)} mensagens processadas")
 
         print("[8/8] Verificando via GET /api/chats (listagem)...")
-        list_resp = httpx.get(f"{API_BASE_URL}/api/chats", timeout=10)
+        list_resp = admin_client.get("/api/chats")
         assert list_resp.status_code == 200
         chats = list_resp.json()["chats"]
         our_chat = [c for c in chats if c["phone_number"] == phone]
@@ -324,7 +335,9 @@ class TestUsuariosSimultaneos:
     todos corretamente em paralelo.
     """
 
-    def test_tres_usuarios_paralelos(self, db_url: str) -> None:
+    def test_tres_usuarios_paralelos(
+        self, db_url: str, admin_client: httpx.Client
+    ) -> None:
         """3 usuários enviam mensagens e cada um recebe sua resposta."""
         users = [
             {"phone": unique_phone("41"), "msg": "Olá, me chamo Alice."},
@@ -373,7 +386,7 @@ class TestUsuariosSimultaneos:
 
         # --- Passo 4: Verificar métricas ---
         print("[4/4] Verificando GET /api/metrics...")
-        metrics_resp = httpx.get(f"{API_BASE_URL}/api/metrics", timeout=10)
+        metrics_resp = admin_client.get("/api/metrics")
         assert metrics_resp.status_code == 200
         metrics = metrics_resp.json()
         print(f"  total_today: {metrics['total_today']}")
@@ -508,7 +521,9 @@ class TestConsistenciaAPIAdmin:
     Envia uma mensagem real e depois verifica todos os endpoints admin.
     """
 
-    def test_api_admin_reflete_estado(self, db_url: str) -> None:
+    def test_api_admin_reflete_estado(
+        self, db_url: str, admin_client: httpx.Client
+    ) -> None:
         """Endpoints admin retornam dados consistentes após interação."""
         phone = unique_phone("71")
 
@@ -526,7 +541,7 @@ class TestConsistenciaAPIAdmin:
 
         # --- GET /api/agents ---
         print("[2/5] Verificando GET /api/agents...")
-        agents_resp = httpx.get(f"{API_BASE_URL}/api/agents", timeout=10)
+        agents_resp = admin_client.get("/api/agents")
         assert agents_resp.status_code == 200
         agents = agents_resp.json()["agents"]
         assert "rhawk_assistant" in agents, (
@@ -536,7 +551,7 @@ class TestConsistenciaAPIAdmin:
 
         # --- GET /api/chats ---
         print("[3/5] Verificando GET /api/chats...")
-        chats_resp = httpx.get(f"{API_BASE_URL}/api/chats?limit=100", timeout=10)
+        chats_resp = admin_client.get("/api/chats?limit=100")
         assert chats_resp.status_code == 200
         chats_data = chats_resp.json()
         chats = chats_data["chats"]
@@ -547,7 +562,7 @@ class TestConsistenciaAPIAdmin:
 
         # --- GET /api/chats/{phone} ---
         print(f"[4/5] Verificando GET /api/chats/{phone}...")
-        msgs_resp = httpx.get(f"{API_BASE_URL}/api/chats/{phone}", timeout=10)
+        msgs_resp = admin_client.get(f"/api/chats/{phone}")
         assert msgs_resp.status_code == 200
         msgs = msgs_resp.json()["messages"]
         assert len(msgs) >= 1, "Nenhuma mensagem retornada"
@@ -560,7 +575,7 @@ class TestConsistenciaAPIAdmin:
 
         # --- GET /api/metrics ---
         print("[5/5] Verificando GET /api/metrics...")
-        metrics_resp = httpx.get(f"{API_BASE_URL}/api/metrics", timeout=10)
+        metrics_resp = admin_client.get("/api/metrics")
         assert metrics_resp.status_code == 200
         metrics = metrics_resp.json()
         assert metrics["total_today"] >= 1, "total_today deveria ser >= 1"

@@ -11,12 +11,15 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 import structlog
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from starlette.middleware.sessions import SessionMiddleware
 
 from whatsapp_langchain.agents.loader import AgentNotFoundError
+from whatsapp_langchain.server.dependencies import require_admin_session
 from whatsapp_langchain.server.routes.admin import router as admin_router
+from whatsapp_langchain.server.routes.auth import router as auth_router
 from whatsapp_langchain.server.routes.health import router as health_router
 from whatsapp_langchain.server.routes.webhook import router as webhook_router
 from whatsapp_langchain.server.routes.webhook_sync import (
@@ -30,6 +33,7 @@ from whatsapp_langchain.shared.db import (
     run_migrations,
 )
 from whatsapp_langchain.shared.observability import setup_logging
+from whatsapp_langchain.shared.redis_client import close_redis, get_redis
 
 logger = structlog.get_logger()
 
@@ -51,12 +55,14 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     pool = await get_pool()
     await run_migrations(pool)
     await bootstrap_langgraph_schema()
+    await get_redis()
     logger.info("server_ready")
 
     yield
 
     # Shutdown
     await close_pool()
+    await close_redis()
     logger.info("server_stopped")
 
 
@@ -67,10 +73,21 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS para o frontend (Next.js)
+# Sessão de admin (cookie assinado) — deve vir antes do CORS para que
+# CORSMiddleware (adicionado por último) rode por fora na pilha.
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=settings.session_secret_key.get_secret_value(),
+    same_site="lax",
+    https_only=settings.session_cookie_secure,
+    max_age=settings.session_max_age_seconds,
+)
+
+# CORS para o frontend (Next.js) — origem explícita, exigida pelo navegador
+# quando allow_credentials=True (cookies de sessão).
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[settings.frontend_origin],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -94,4 +111,5 @@ async def agent_not_found_handler(
 app.include_router(health_router)
 app.include_router(webhook_router)
 app.include_router(webhook_sync_router)
-app.include_router(admin_router)
+app.include_router(auth_router)
+app.include_router(admin_router, dependencies=[Depends(require_admin_session)])
