@@ -18,6 +18,8 @@ dependencies = [
     "twilio==9.10.2",
     "itsdangerous==2.2.0",
     "redis==5.2.1",
+    "google-api-python-client>=2.100.0",
+    "google-auth>=2.30.0",
 ]
 
 [build-system]

@@ -9,41 +9,23 @@ from typing import Annotated, Any
 from uuid import uuid4
 
 import structlog
-from langchain_core.runnables.config import var_child_runnable_config
 from langchain_core.tools import InjectedToolArg, tool
 from langgraph.prebuilt import InjectedStore
 from langgraph.store.base import BaseStore
 
+from whatsapp_langchain.agents.tools._runtime import extract_phone
 from whatsapp_langchain.shared.config import settings
 
 logger = structlog.get_logger()
 
 
-def _extract_configurable(runtime: Any) -> dict:
-    """Extrai `configurable` do contexto de execução da tool."""
-    if runtime is not None:
-        config = getattr(runtime, "config", None)
-        if isinstance(config, dict):
-            configurable = config.get("configurable", {})
-            if isinstance(configurable, dict):
-                return configurable
-
-    cfg = var_child_runnable_config.get(None)
-    if isinstance(cfg, dict):
-        configurable = cfg.get("configurable", {})
-        if isinstance(configurable, dict):
-            return configurable
-
-    return {}
-
-
 def _extract_namespace(runtime: Any) -> tuple[tuple[str, str] | None, str | None]:
     """Resolve namespace de memória a partir do user_id."""
-    configurable = _extract_configurable(runtime)
-    user_id = configurable.get("user_id")
-    if not user_id:
-        return None, "user_id não encontrado na configuração."
-    return (str(user_id), "memories"), None
+    phone, error = extract_phone(runtime)
+    if error:
+        return None, error
+    assert phone is not None
+    return (phone, "memories"), None
 
 
 @tool

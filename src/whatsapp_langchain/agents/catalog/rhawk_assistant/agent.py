@@ -23,7 +23,17 @@ from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.store.base import BaseStore
 
 from whatsapp_langchain.agents.middleware import get_context_middleware
-from whatsapp_langchain.agents.tools import read_memory, save_memory
+from whatsapp_langchain.agents.tools import (
+    book_appointment,
+    cancel_appointment,
+    check_availability,
+    get_current_date,
+    list_my_appointments,
+    read_memory,
+    reschedule_appointment,
+    save_memory,
+)
+from whatsapp_langchain.shared.config import settings
 from whatsapp_langchain.shared.llm import create_chat_model
 
 from .prompts import SYSTEM_PROMPT
@@ -70,6 +80,17 @@ def build_graph(
 
     # Tools de memória — resolvem o store via InjectedStore em runtime
     tools = [save_memory, read_memory] if enable_memory_tools else []
+
+    # Tools de agendamento (Google Calendar) — só habilitadas se configuradas
+    if settings.google_calendar_enabled:
+        tools += [
+            get_current_date,
+            check_availability,
+            book_appointment,
+            reschedule_appointment,
+            cancel_appointment,
+            list_my_appointments,
+        ]
 
     return create_agent(
         model=model,

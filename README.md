@@ -166,6 +166,7 @@ Para detalhes técnicos:
 - [Criando Agentes](docs/ADDING_AGENTS.md)
 - [Banco de Dados](docs/DATABASE.md)
 - [Integração Twilio](docs/TWILIO.md)
+- [Google Calendar (agendamento)](docs/GOOGLE_CALENDAR.md)
 - [Deploy](docs/DEPLOY.md)
 
 

@@ -2,6 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { api, type Metrics } from "../../../lib/api";
+import StatCard from "../../../components/StatCard";
+import { CardsSkeleton } from "../../../components/LoadingState";
+import { IconAlertCircle, IconChats, IconClock, IconInbox } from "../../../components/icons";
+import styles from "./page.module.css";
 
 export default function DashboardPage() {
   const [metrics, setMetrics] = useState<Metrics | null>(null);
@@ -16,40 +20,40 @@ export default function DashboardPage() {
   }, []);
 
   return (
-    <div>
-      <h1 style={{ marginTop: 0 }}>Dashboard</h1>
+    <div style={{ padding: "1.6rem 2rem" }}>
+      <div className={styles.header}>
+        <h1 className={styles.title}>Dashboard</h1>
+        <p className="muted">Atualizado automaticamente a cada 10s</p>
+      </div>
+
       {error && <p className="error-text">{error}</p>}
-      {!metrics && !error && <p className="muted">Carregando métricas...</p>}
+      {!metrics && !error && <CardsSkeleton />}
+
       {metrics && (
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-            gap: "1rem",
-          }}
-        >
-          <StatCard label="Mensagens hoje" value={metrics.total_today} />
-          <StatCard label="Falhas hoje" value={metrics.failures_today} />
+        <div className={styles.grid}>
+          <StatCard
+            label="Mensagens hoje"
+            value={metrics.total_today}
+            icon={<IconChats size={20} />}
+          />
+          <StatCard
+            label="Falhas hoje"
+            value={metrics.failures_today}
+            icon={<IconAlertCircle size={20} />}
+            tone={metrics.failures_today > 0 ? "danger" : "neutral"}
+          />
           <StatCard
             label="Tempo médio (s)"
             value={metrics.avg_processing_time_seconds ?? "-"}
+            icon={<IconClock size={20} />}
           />
-          <StatCard label="Fila atual" value={metrics.queue_size} />
+          <StatCard
+            label="Fila atual"
+            value={metrics.queue_size}
+            icon={<IconInbox size={20} />}
+          />
         </div>
       )}
-    </div>
-  );
-}
-
-function StatCard({ label, value }: { label: string; value: number | string }) {
-  return (
-    <div className="card">
-      <p className="muted" style={{ margin: 0 }}>
-        {label}
-      </p>
-      <p style={{ fontSize: "1.8rem", margin: "0.3rem 0 0", fontWeight: 600 }}>
-        {value}
-      </p>
     </div>
   );
 }

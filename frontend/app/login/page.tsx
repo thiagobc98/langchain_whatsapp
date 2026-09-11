@@ -3,6 +3,8 @@
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { api, ApiError } from "../../lib/api";
+import { IconLock, IconUser } from "../../components/icons";
+import styles from "./page.module.css";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -26,50 +28,52 @@ export default function LoginPage() {
   }
 
   return (
-    <main
-      style={{
-        minHeight: "100vh",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-      }}
-    >
-      <form
-        onSubmit={handleSubmit}
-        className="card"
-        style={{ width: "100%", maxWidth: 360, display: "grid", gap: "0.9rem" }}
-      >
-        <div>
-          <h1 style={{ fontSize: "1.2rem", margin: 0 }}>WhatsApp LangChain</h1>
-          <p className="muted" style={{ margin: "0.2rem 0 0" }}>
-            Admin Panel
-          </p>
+    <main className={styles.page}>
+      <form onSubmit={handleSubmit} className={`card ${styles.card}`}>
+        <div className={styles.logo}>
+          <span className={styles.logoMark}>W</span>
+          <div>
+            <h1 className={styles.title}>WhatsApp CRM</h1>
+            <p className={styles.subtitle}>Painel administrativo</p>
+          </div>
         </div>
 
-        <label style={{ display: "grid", gap: "0.3rem" }}>
-          <span className="muted">Usuário</span>
-          <input
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            autoComplete="username"
-            required
-          />
+        <label className={styles.field}>
+          <span className={styles.label}>Usuário</span>
+          <div className={styles.inputWrap}>
+            <span className={styles.inputIcon}>
+              <IconUser size={16} />
+            </span>
+            <input
+              className={styles.input}
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              autoComplete="username"
+              required
+            />
+          </div>
         </label>
 
-        <label style={{ display: "grid", gap: "0.3rem" }}>
-          <span className="muted">Senha</span>
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            autoComplete="current-password"
-            required
-          />
+        <label className={styles.field}>
+          <span className={styles.label}>Senha</span>
+          <div className={styles.inputWrap}>
+            <span className={styles.inputIcon}>
+              <IconLock size={16} />
+            </span>
+            <input
+              className={styles.input}
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              autoComplete="current-password"
+              required
+            />
+          </div>
         </label>
 
-        {error && <span className="error-text">{error}</span>}
+        {error && <span className={styles.error}>{error}</span>}
 
-        <button type="submit" disabled={loading}>
+        <button type="submit" disabled={loading} className={styles.submit}>
           {loading ? "Entrando..." : "Entrar"}
         </button>
       </form>

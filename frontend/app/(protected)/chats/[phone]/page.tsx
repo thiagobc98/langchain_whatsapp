@@ -2,70 +2,79 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import Link from "next/link";
 import { api, type ChatMessage } from "../../../../lib/api";
+import { useChats } from "../../../../components/conversations/ChatsContext";
+import ConversationHeader from "../../../../components/conversations/ConversationHeader";
+import MessageList from "../../../../components/conversations/MessageList";
+import MessageInput from "../../../../components/conversations/MessageInput";
+import CustomerPanel from "../../../../components/conversations/CustomerPanel";
+import { MessagesSkeleton } from "../../../../components/LoadingState";
+import styles from "./page.module.css";
+
+const POLL_MS = 5_000;
 
 export default function ChatDetailPage() {
   const params = useParams<{ phone: string }>();
   const phone = decodeURIComponent(params.phone);
+  const { findChat } = useChats();
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [infoOpen, setInfoOpen] = useState(false);
 
   useEffect(() => {
-    api
-      .chatMessages(phone)
-      .then((data) => setMessages(data.messages))
-      .catch((e) => setError(e.message));
+    let cancelled = false;
+    setLoading(true);
+    setInfoOpen(false);
+
+    function fetchMessages() {
+      api
+        .chatMessages(phone)
+        .then((data) => {
+          if (!cancelled) {
+            setMessages(data.messages);
+            setError(null);
+          }
+        })
+        .catch((e) => {
+          if (!cancelled) setError(e.message);
+        })
+        .finally(() => {
+          if (!cancelled) setLoading(false);
+        });
+    }
+
+    fetchMessages();
+    const interval = setInterval(fetchMessages, POLL_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
   }, [phone]);
 
-  return (
-    <div>
-      <p>
-        <Link href="/chats">&larr; Conversas</Link>
-      </p>
-      <h1 style={{ marginTop: 0 }}>{phone}</h1>
-      {error && <p className="error-text">{error}</p>}
+  const chat = findChat(phone);
 
-      <div style={{ display: "grid", gap: "0.8rem" }}>
-        {messages.map((msg) => (
-          <div key={msg.id} className="card">
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                marginBottom: "0.5rem",
-              }}
-            >
-              <span className="muted">
-                {msg.created_at
-                  ? new Date(msg.created_at).toLocaleString("pt-BR")
-                  : "-"}
-              </span>
-              <StatusBadge status={msg.status} />
-            </div>
-            <p style={{ margin: "0 0 0.4rem" }}>
-              <strong>Usuário:</strong> {msg.incoming_message || msg.normalized_input || "-"}
-            </p>
-            <p style={{ margin: 0 }}>
-              <strong>Agente:</strong> {msg.response || msg.error || "-"}
-            </p>
-          </div>
-        ))}
-        {messages.length === 0 && !error && (
-          <p className="muted">Nenhuma mensagem para este contato.</p>
-        )}
+  return (
+    <div className={styles.wrap}>
+      <div className={styles.conversation}>
+        <ConversationHeader
+          phone={phone}
+          chat={chat}
+          infoOpen={infoOpen}
+          onToggleInfo={() => setInfoOpen((v) => !v)}
+        />
+
+        {error && <p className="error-text" style={{ padding: "0.6rem 1.1rem" }}>{error}</p>}
+
+        {loading ? <MessagesSkeleton /> : <MessageList messages={messages} />}
+
+        <MessageInput />
       </div>
-    </div>
-  );
-}
 
-function StatusBadge({ status }: { status: string }) {
-  const color =
-    status === "done" ? "var(--success)" : status === "failed" ? "var(--danger)" : "var(--text-muted)";
-  return (
-    <span className="muted" style={{ color }}>
-      {status}
-    </span>
+      {infoOpen && (
+        <CustomerPanel phone={phone} chat={chat} onClose={() => setInfoOpen(false)} />
+      )}
+    </div>
   );
 }

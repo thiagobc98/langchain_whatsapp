@@ -112,6 +112,26 @@ class Settings(BaseSettings):
     embedding_dims: int = 1536
     memory_search_limit: int = 5
 
+    # --- Google Calendar (agendamento) ---
+    google_calendar_enabled: bool = False
+    # Credenciais de Service Account: preencha UMA das duas opções.
+    # JSON completo em uma linha só (ex: Railway, onde montar arquivo não é
+    # simples) — tem prioridade sobre o arquivo se ambos estiverem definidos.
+    google_service_account_json: str = ""
+    # Caminho para o arquivo .json da service account (ex: docker-compose
+    # local, via volume montado).
+    google_service_account_file: str = ""
+    # ID do calendário (e-mail da conta Google, ou "primary" se a service
+    # account for dona do calendário). A agenda precisa estar compartilhada
+    # com o e-mail da service account, com permissão de "fazer alterações".
+    google_calendar_id: str = ""
+    # Fuso horário usado para interpretar datas/horários do agendamento.
+    business_timezone: str = "America/Sao_Paulo"
+    # Janela de atendimento (hora cheia, 0-23) e duração padrão da consulta.
+    business_hour_start: int = 9
+    business_hour_end: int = 18
+    appointment_duration_minutes: int = 30
+
 
 # Singleton — importar de qualquer lugar do projeto
 settings = Settings()
