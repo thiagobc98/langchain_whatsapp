@@ -42,6 +42,7 @@ class MessageQueue(BaseModel):
     thread_id: str = Field(description="ID do thread para checkpointer: phone:agent_id")
     incoming_message: str
     media_url: str | None = None
+    media_base64: str | None = None
     media_type: str | None = None
     normalized_input: str | None = None
     media_processing_status: str | None = None
@@ -74,24 +75,6 @@ class Conversation(BaseModel):
     message_count: int = 0
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
-
-
-class TwilioWebhookPayload(BaseModel):
-    """Payload recebido no webhook do Twilio.
-
-    O Twilio envia os dados como form-encoded (application/x-www-form-urlencoded).
-    Campos opcionais podem estar ausentes dependendo do tipo de mensagem.
-    """
-
-    MessageSid: str = Field(description="ID único da mensagem no Twilio")
-    From: str = Field(description="Remetente, ex: whatsapp:+5511999999999")
-    To: str = Field(description="Destinatário, ex: whatsapp:+14155238886")
-    Body: str = Field(default="", description="Texto da mensagem")
-    NumMedia: str = Field(default="0", description="Número de mídias anexadas")
-    MediaUrl0: str | None = Field(default=None, description="URL da primeira mídia")
-    MediaContentType0: str | None = Field(
-        default=None, description="MIME type da primeira mídia"
-    )
 
 
 class EnqueueResult(BaseModel):

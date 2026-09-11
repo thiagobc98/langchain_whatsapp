@@ -7,7 +7,7 @@ entrada confiável, processamento assíncrono, persistência, recuperação de f
 ## Estado Atual (Fase 4 concluída)
 
 Implementado:
-- API FastAPI com webhook Twilio assíncrono (`POST /webhook/twilio`)
+- API FastAPI com webhook Evolution API assíncrono (`POST /webhook/evolution/{token}`)
 - fila em PostgreSQL (`message_queue`) com debounce e lease
 - worker assíncrono consumindo fila com `FOR UPDATE SKIP LOCKED`
 - execução de agentes via loader dinâmico
@@ -17,8 +17,8 @@ Implementado:
 - memória semântica orientada a tools (`save_memory` e `read_memory`)
 - processamento de mídia (imagem e áudio) via OpenRouter
 - retry com backoff progressivo e status de falha
-- envio real de resposta via API Twilio no worker
-- validação criptográfica completa da assinatura Twilio
+- envio real de resposta via Evolution API no worker
+- validação do webhook via token secreto no path (Evolution não assina requests)
 - rate limit distribuído via Redis (sliding window, compartilhado entre réplicas)
 - autenticação do admin panel (login + cookie de sessão assinado)
 - APIs administrativas para inspeção, protegidas por sessão de admin
@@ -30,7 +30,7 @@ Implementado:
 ![Arquitetura](architecture.png)
 
 ```text
-[Twilio/WhatsApp]
+[Evolution API/WhatsApp]
       |
       v
 [API FastAPI]
@@ -58,14 +58,14 @@ Implementado:
 ### API (`src/whatsapp_langchain/server/`)
 
 Responsabilidades:
-- aceitar webhook Twilio
-- responder rápido com TwiML vazio
+- aceitar webhook Evolution API
+- responder rápido com confirmação de recebimento
 - não executar agente inline
 - enfileirar payload normalizado
 
 Contratos relevantes:
-- `agent` via query string
-- payload form-encoded Twilio (`From`, `To`, `Body`, `NumMedia`, etc)
+- `agent` via query string, `token` secreto via path (`/webhook/evolution/{token}`)
+- payload JSON do Evolution (evento `messages.upsert`, mídia em base64)
 - `thread_id = "{phone}:{agent}"`
 
 ### Worker (`src/whatsapp_langchain/worker/`)
@@ -79,7 +79,7 @@ Responsabilidades:
 
 Contrato de execução do agente:
 - `thread_id`: memória de conversa (checkpointer)
-- `user_id`: memória cross-thread (store semântico), derivado do telefone do webhook Twilio
+- `user_id`: memória cross-thread (store semântico), derivado do telefone do webhook Evolution
 
 ### Shared (`src/whatsapp_langchain/shared/`)
 
@@ -120,7 +120,7 @@ Tabela agregada para consultas administrativas.
 ## Fluxo End-to-End
 
 1. Usuário envia mensagem no WhatsApp.
-2. Twilio faz `POST /webhook/twilio?agent=<agent_id>`.
+2. Evolution API faz `POST /webhook/evolution/{token}?agent=<agent_id>`.
 3. API valida agente, aplica rate limit e chama `enqueue_or_buffer`.
 4. Debounce concatena mensagens rápidas do mesmo usuário/agente.
 5. Worker faz `claim_next` com lease.
@@ -143,7 +143,7 @@ Persistência de mensagens de uma conversa específica (`thread_id`).
 - namespace: `(user_id, "memories")`
 - `save_memory` grava fatos relevantes
 - `read_memory` recupera memórias por similaridade quando o agente precisar
-- `user_id` no runtime vem de `phone_number` (payload Twilio)
+- `user_id` no runtime vem de `phone_number` (payload Evolution)
 - não usamos escopo `tenant_user`/`tenant_shared` neste projeto
 
 Isso separa duas necessidades diferentes:
@@ -180,7 +180,7 @@ Logs estruturados com `structlog` em todos os componentes.
 ## Endpoints Disponíveis
 
 - `GET /health`
-- `POST /webhook/twilio?agent=<id>`
+- `POST /webhook/evolution/{token}?agent=<id>`
 - `POST /webhook/sync?agent=<id>` (educacional)
 - `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/me`
 - `GET /api/agents` (requer sessão de admin)

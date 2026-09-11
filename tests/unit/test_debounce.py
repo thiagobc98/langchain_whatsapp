@@ -188,7 +188,7 @@ class TestTextDebounce:
         assert "media_url IS NULL" in select_sql
 
     async def test_text_insert_has_null_media(self, mock_pool):
-        """Inserção de texto sempre tem media_url=NULL e media_type=NULL."""
+        """Inserção de texto sempre tem media_url/media_base64/media_type=NULL."""
         pool, conn = mock_pool
         setup_no_existing(conn)
 
@@ -202,9 +202,10 @@ class TestTextDebounce:
         # calls[0]=lock, calls[1]=SELECT, calls[2]=INSERT
         calls = conn.execute.call_args_list
         insert_params = calls[2][0][1]
-        # media_url e media_type devem ser None na inserção de texto
+        # media_url, media_base64 e media_type devem ser None na inserção de texto
         assert insert_params[6] is None  # media_url
-        assert insert_params[7] is None  # media_type
+        assert insert_params[7] is None  # media_base64
+        assert insert_params[8] is None  # media_type
 
 
 class TestMediaNoDebounce:
@@ -220,7 +221,7 @@ class TestMediaNoDebounce:
             phone_number="+5511999999999",
             agent_id="assistant",
             body="",
-            media_url="https://api.twilio.com/media/img.jpg",
+            media_url="https://example.com/media/img.jpg",
             media_type="image/jpeg",
         )
 
@@ -243,7 +244,7 @@ class TestMediaNoDebounce:
             phone_number="+5511999999999",
             agent_id="assistant",
             body="Foto do recibo",
-            media_url="https://api.twilio.com/media/img.jpg",
+            media_url="https://example.com/media/img.jpg",
             media_type="image/jpeg",
         )
 
@@ -265,7 +266,7 @@ class TestMediaNoDebounce:
             phone_number="+5511999999999",
             agent_id="assistant",
             body="Olha essa foto",
-            media_url="https://api.twilio.com/media/img.jpg",
+            media_base64="aGVsbG8=",
             media_type="image/jpeg",
         )
 
@@ -274,9 +275,9 @@ class TestMediaNoDebounce:
         insert_params = calls[2][0][1]
         # Body é preservado na mídia
         assert insert_params[5] == "Olha essa foto"
-        # media_url e media_type presentes
-        assert insert_params[6] == "https://api.twilio.com/media/img.jpg"
-        assert insert_params[7] == "image/jpeg"
+        # media_base64 e media_type presentes
+        assert insert_params[7] == "aGVsbG8="
+        assert insert_params[8] == "image/jpeg"
 
 
 class TestMediaFlushPendingText:
@@ -292,7 +293,7 @@ class TestMediaFlushPendingText:
             phone_number="+5511999999999",
             agent_id="assistant",
             body="",
-            media_url="https://api.twilio.com/media/img.jpg",
+            media_url="https://example.com/media/img.jpg",
             media_type="image/jpeg",
         )
 
@@ -319,7 +320,7 @@ class TestMediaFlushPendingText:
             phone_number="+5511111111111",
             agent_id="bot_a",
             body="",
-            media_url="https://api.twilio.com/media/audio.ogg",
+            media_url="https://example.com/media/audio.ogg",
             media_type="audio/ogg",
         )
 
@@ -338,7 +339,7 @@ class TestMediaFlushPendingText:
             phone_number="+5511999999999",
             agent_id="assistant",
             body="",
-            media_url="https://api.twilio.com/media/img.jpg",
+            media_url="https://example.com/media/img.jpg",
             media_type="image/jpeg",
         )
 
@@ -355,7 +356,7 @@ class TestMediaFlushPendingText:
             phone_number="+5511999999999",
             agent_id="assistant",
             body="",
-            media_url="https://api.twilio.com/media/img2.jpg",
+            media_url="https://example.com/media/img2.jpg",
             media_type="image/jpeg",
         )
 
@@ -495,7 +496,7 @@ class TestSequentialTextThenMedia:
             phone_number="+5511999999999",
             agent_id="assistant",
             body="Foto",
-            media_url="https://api.twilio.com/media/img.jpg",
+            media_url="https://example.com/media/img.jpg",
             media_type="image/jpeg",
         )
 
@@ -635,7 +636,7 @@ class TestAdvisoryLock:
             phone_number="+5511999999999",
             agent_id="assistant",
             body="",
-            media_url="https://api.twilio.com/media/img.jpg",
+            media_url="https://example.com/media/img.jpg",
             media_type="image/jpeg",
         )
 

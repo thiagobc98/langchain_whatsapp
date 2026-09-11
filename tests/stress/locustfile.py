@@ -1,14 +1,13 @@
-"""Stress test do webhook Twilio via Locust.
+"""Stress test do webhook Evolution API via Locust.
 
 Simula múltiplos usuários enviando mensagens simultâneas para
-/webhook/twilio, exercitando o pipeline completo: rate limit (Redis),
-debounce/fila (PostgreSQL) e worker.
+/webhook/evolution/{token}, exercitando o pipeline completo: rate limit
+(Redis), debounce/fila (PostgreSQL) e worker.
 
-IMPORTANTE: só rode contra a stack local (`make up`), com
-VALIDATE_TWILIO_SIGNATURE=false. O Locust não consegue gerar uma
-assinatura HMAC-SHA1 válida do Twilio, então com validação habilitada
-todas as requisições seriam rejeitadas com 403. Nunca aponte isto para
-produção.
+IMPORTANTE: só rode contra a stack local (`make up`). Configure
+LOCUST_WEBHOOK_TOKEN com o mesmo valor de EVOLUTION_WEBHOOK_TOKEN do
+.env usado pela stack — sem o token correto, todas as requisições são
+rejeitadas com 403. Nunca aponte isto para produção.
 
 Uso:
     make stress            # modo UI (http://localhost:8089)
@@ -24,11 +23,14 @@ import uuid
 from locust import HttpUser, between, task
 
 AGENT_ID = os.getenv("LOCUST_AGENT_ID", "rhawk_assistant")
+WEBHOOK_TOKEN = os.getenv(
+    "LOCUST_WEBHOOK_TOKEN", os.getenv("EVOLUTION_WEBHOOK_TOKEN", "")
+)
 
 # Pool fixo de números de telefone — reutilizados entre requisições para
 # exercitar debounce (mensagens agrupadas) e rate limit (por telefone) de
 # forma realista, em vez de cada requisição ser um usuário "novo".
-PHONE_POOL = [f"+5511900{n:06d}" for n in range(50)]
+PHONE_POOL = [f"5511900{n:06d}" for n in range(50)]
 
 SAMPLE_MESSAGES = [
     "Olá, quero saber mais sobre o produto.",
@@ -39,8 +41,8 @@ SAMPLE_MESSAGES = [
 ]
 
 
-class TwilioWebhookUser(HttpUser):
-    """Simula um cliente WhatsApp enviando mensagens via webhook Twilio."""
+class EvolutionWebhookUser(HttpUser):
+    """Simula um cliente WhatsApp enviando mensagens via webhook Evolution."""
 
     wait_time = between(1, 3)
 
@@ -50,13 +52,19 @@ class TwilioWebhookUser(HttpUser):
         message = SAMPLE_MESSAGES[uuid.uuid4().int % len(SAMPLE_MESSAGES)]
 
         self.client.post(
-            f"/webhook/twilio?agent={AGENT_ID}",
-            data={
-                "MessageSid": f"SM{uuid.uuid4().hex[:24]}",
-                "From": f"whatsapp:{phone}",
-                "To": "whatsapp:+14155238886",
-                "Body": message,
-                "NumMedia": "0",
+            f"/webhook/evolution/{WEBHOOK_TOKEN}?agent={AGENT_ID}",
+            json={
+                "event": "messages.upsert",
+                "instance": "stress-test",
+                "data": {
+                    "key": {
+                        "remoteJid": f"{phone}@s.whatsapp.net",
+                        "fromMe": False,
+                        "id": f"MSG{uuid.uuid4().hex[:24]}",
+                    },
+                    "message": {"conversation": message},
+                    "messageType": "conversation",
+                },
             },
-            name="/webhook/twilio",
+            name="/webhook/evolution",
         )

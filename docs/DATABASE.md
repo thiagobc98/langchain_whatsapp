@@ -22,10 +22,10 @@ Controle das migrações SQL locais (`db/migrations/*.sql`).
 Fila operacional de mensagens.
 
 Campos principais:
-- `message_id`: id externo (ex: Twilio MessageSid)
+- `message_id`: id externo da mensagem (ex: `key.id` do Evolution API)
 - `phone_number`, `agent_id`, `thread_id`
 - `incoming_message`: entrada original
-- `media_url`, `media_type`
+- `media_base64`, `media_type` (`media_url` existe por compatibilidade histórica, não usado pelo Evolution)
 - `normalized_input`: texto final enviado ao agente (quando houver)
 - `media_processing_status`: `none | processed | disabled | failed | unsupported`
 - `media_processing_error`: erro de pré-processamento de mídia

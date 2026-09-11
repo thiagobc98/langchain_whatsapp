@@ -1,18 +1,18 @@
-"""Processador de mensagens — orquestra agente, typing e envio Twilio.
+"""Processador de mensagens — orquestra agente, typing e envio Evolution API.
 
 Responsável por:
 1. Pré-processar entrada (mídia -> texto)
 2. Enviar typing indicator (best-effort)
 3. Carregar o agente via loader (com checkpointer PostgreSQL)
 4. Executar o agente
-5. Enviar resposta ao usuário via Twilio
+5. Enviar resposta ao usuário via Evolution API
 6. Salvar no banco (mark_done somente após envio confirmado)
 
 Decisões arquiteturais (Fase 3):
-- Twilio é obrigatório — não existe caminho sem envio confirmado.
+- Envio confirmado é obrigatório — não existe caminho sem envio confirmado.
 - Typing é tentado em 100% das execuções normais (best-effort).
 - Falha de typing NÃO interrompe o processamento.
-- mark_done ocorre somente após envio Twilio bem-sucedido.
+- mark_done ocorre somente após envio bem-sucedido.
 - Falha de envio entra no fluxo de retry (mark_failed).
 
 Uso:
@@ -22,7 +22,7 @@ Uso:
         message, pool,
         checkpointer=checkpointer,
         store=store,
-        twilio=twilio,
+        evolution=evolution,
     )
 """
 
@@ -39,11 +39,11 @@ from whatsapp_langchain.shared.queue import (
     mark_failed,
     upsert_conversation,
 )
+from whatsapp_langchain.worker.evolution_client import EvolutionClient
 from whatsapp_langchain.worker.media import (
     AUTO_RESPONSE_MEDIA_FAILURE,
     preprocess_incoming_message,
 )
-from whatsapp_langchain.worker.twilio_client import TwilioClient
 
 logger = structlog.get_logger()
 
@@ -54,22 +54,22 @@ async def process_message(
     *,
     checkpointer: BaseCheckpointSaver,
     store: BaseStore | None = None,
-    twilio: TwilioClient,
+    evolution: EvolutionClient,
 ) -> None:
     """Processa uma mensagem da fila com o agente apropriado.
 
-    Faz download de mídia se presente, envia typing, carrega o grafo
+    Decodifica mídia base64 se presente, envia typing, carrega o grafo
     do agente com checkpointer PostgreSQL, executa, envia a resposta
-    via Twilio e salva no banco.
+    via Evolution API e salva no banco.
 
-    Twilio é obrigatório — nenhum mark_done ocorre sem envio confirmado.
+    Envio confirmado é obrigatório — nenhum mark_done ocorre sem isso.
 
     Args:
         message: Mensagem a processar (já reservada via claim).
         pool: Pool de conexões do psycopg.
         checkpointer: Checkpointer LangGraph já inicializado no boot.
         store: Store LangGraph compartilhado (None se memória desabilitada).
-        twilio: Cliente Twilio para envio (obrigatório).
+        evolution: Cliente Evolution API para envio (obrigatório).
     """
     logger.info(
         "processing_message",
@@ -83,7 +83,7 @@ async def process_message(
         # 1. Pré-processar entrada (mídia -> texto) antes do agente
         pre = await preprocess_incoming_message(
             body=message.incoming_message,
-            media_url=message.media_url,
+            media_base64=message.media_base64,
             media_type=message.media_type,
         )
 
@@ -91,8 +91,8 @@ async def process_message(
         if not pre.should_invoke_agent:
             auto_response = pre.auto_response or AUTO_RESPONSE_MEDIA_FAILURE
 
-            # Enviar auto-response via Twilio antes de marcar como done
-            await twilio.send_message(message.phone_number, auto_response)
+            # Enviar auto-response antes de marcar como done
+            await evolution.send_message(message.phone_number, auto_response)
 
             await mark_done(
                 pool,
@@ -119,7 +119,7 @@ async def process_message(
 
         # 2. Typing indicator (best-effort, falha não interrompe processamento)
         try:
-            await twilio.send_typing(message.phone_number, message.message_id)
+            await evolution.send_typing(message.phone_number)
         except Exception as typing_err:
             logger.warning(
                 "typing_failed",
@@ -152,8 +152,8 @@ async def process_message(
         # 4. Extrair resposta
         response_text = result["messages"][-1].content
 
-        # 5. Enviar resposta via Twilio (obrigatório antes de mark_done)
-        await twilio.send_message(message.phone_number, response_text)
+        # 5. Enviar resposta via Evolution API (obrigatório antes de mark_done)
+        await evolution.send_message(message.phone_number, response_text)
 
         # 6. mark_done somente após envio confirmado
         await mark_done(

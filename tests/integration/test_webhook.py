@@ -18,8 +18,12 @@ client = TestClient(app, raise_server_exceptions=False)
 
 
 @pytest.fixture(autouse=True)
-def mock_db():
+def mock_db(monkeypatch):
     """Mock do banco de dados e do Redis para testes sem infra real."""
+    from whatsapp_langchain.shared.config import settings
+
+    monkeypatch.setattr(settings, "evolution_webhook_token", "test-webhook-token")
+
     mock_pool = AsyncMock()
     fake_redis = fakeredis.FakeAsyncRedis()
 
@@ -29,7 +33,7 @@ def mock_db():
             return_value=True,
         ),
         patch(
-            "whatsapp_langchain.server.routes.webhook.get_pool",
+            "whatsapp_langchain.server.routes.webhook_evolution.get_pool",
             return_value=mock_pool,
         ),
         patch(
@@ -45,6 +49,25 @@ def mock_db():
         ),
     ):
         yield mock_pool
+
+
+WEBHOOK_TOKEN = "test-webhook-token"
+
+
+def _message_payload(text: str = "Olá", phone: str = "5511999999999") -> dict:
+    return {
+        "event": "messages.upsert",
+        "instance": "test",
+        "data": {
+            "key": {
+                "remoteJid": f"{phone}@s.whatsapp.net",
+                "fromMe": False,
+                "id": "MSG123",
+            },
+            "message": {"conversation": text},
+            "messageType": "conversation",
+        },
+    }
 
 
 @pytest.fixture
@@ -99,78 +122,88 @@ class TestWebhookSync:
         assert response.status_code == 400
 
 
-class TestWebhookTwilio:
-    """Testes do webhook Twilio."""
+class TestWebhookEvolution:
+    """Testes do webhook Evolution API."""
 
-    def test_twilio_requires_agent(self):
+    def test_requires_agent(self):
         """Deve exigir o query param 'agent'."""
         response = client.post(
-            "/webhook/twilio",
-            data={
-                "MessageSid": "SM123",
-                "From": "whatsapp:+5511999999999",
-                "To": "whatsapp:+14155238886",
-                "Body": "Olá",
-                "NumMedia": "0",
-            },
+            f"/webhook/evolution/{WEBHOOK_TOKEN}",
+            json=_message_payload(),
         )
         # Sem agent= -> 422
         assert response.status_code == 422
 
-    def test_twilio_nonexistent_agent(self):
+    def test_nonexistent_agent(self):
         """Deve retornar erro para agente inexistente."""
         response = client.post(
-            "/webhook/twilio?agent=nao_existe",
-            data={
-                "MessageSid": "SM123",
-                "From": "whatsapp:+5511999999999",
-                "To": "whatsapp:+14155238886",
-                "Body": "Olá",
-                "NumMedia": "0",
-            },
+            f"/webhook/evolution/{WEBHOOK_TOKEN}?agent=nao_existe",
+            json=_message_payload(),
         )
         assert response.status_code == 400
 
-    @patch("whatsapp_langchain.server.routes.webhook.enqueue_or_buffer")
-    def test_twilio_enqueues_message(self, mock_enqueue):
-        """Deve enfileirar mensagem e retornar TwiML vazio."""
+    def test_rejects_wrong_token(self):
+        """Deve rejeitar com 403 quando o token do path não confere."""
+        response = client.post(
+            "/webhook/evolution/token-errado?agent=rhawk_assistant",
+            json=_message_payload(),
+        )
+        assert response.status_code == 403
+
+    @patch("whatsapp_langchain.server.routes.webhook_evolution.enqueue_or_buffer")
+    def test_enqueues_message(self, mock_enqueue):
+        """Deve enfileirar mensagem e confirmar recebimento."""
         from whatsapp_langchain.shared.models import EnqueueResult
 
         mock_enqueue.return_value = EnqueueResult(message_id=1, is_buffered=False)
 
         response = client.post(
-            "/webhook/twilio?agent=rhawk_assistant",
-            data={
-                "MessageSid": "SM123",
-                "From": "whatsapp:+5511999999999",
-                "To": "whatsapp:+14155238886",
-                "Body": "Olá",
-                "NumMedia": "0",
-            },
+            f"/webhook/evolution/{WEBHOOK_TOKEN}?agent=rhawk_assistant",
+            json=_message_payload(),
         )
         assert response.status_code == 200
-        assert "Response" in response.text
+        assert response.json() == {"received": True}
+        mock_enqueue.assert_awaited_once()
+        assert mock_enqueue.call_args.kwargs["phone_number"] == "+5511999999999"
 
-    def test_twilio_openapi_exposes_form_fields(self):
-        """Swagger deve exibir body form-encoded para teste manual."""
-        openapi = client.get("/openapi.json").json()
-        post = openapi["paths"]["/webhook/twilio"]["post"]
-        assert "requestBody" in post
+    @patch("whatsapp_langchain.server.routes.webhook_evolution.enqueue_or_buffer")
+    def test_ignores_group_messages(self, mock_enqueue):
+        """Mensagens de grupo (@g.us) devem ser ignoradas sem enfileirar."""
+        payload = _message_payload()
+        payload["data"]["key"]["remoteJid"] = "120363000000000000@g.us"
 
-        form_content = post["requestBody"]["content"][
-            "application/x-www-form-urlencoded"
-        ]
-        schema = form_content["schema"]
-        if "$ref" in schema:
-            ref_name = schema["$ref"].split("/")[-1]
-            schema = openapi["components"]["schemas"][ref_name]
+        response = client.post(
+            f"/webhook/evolution/{WEBHOOK_TOKEN}?agent=rhawk_assistant",
+            json=payload,
+        )
+        assert response.status_code == 200
+        assert response.json() == {"ignored": True}
+        mock_enqueue.assert_not_awaited()
 
-        properties = schema["properties"]
-        assert "MessageSid" in properties
-        assert "From" in properties
-        assert "To" in properties
-        assert "Body" in properties
-        assert "NumMedia" in properties
+    @patch("whatsapp_langchain.server.routes.webhook_evolution.enqueue_or_buffer")
+    def test_ignores_own_echoed_messages(self, mock_enqueue):
+        """Mensagens com fromMe=true (eco do próprio bot) são ignoradas."""
+        payload = _message_payload()
+        payload["data"]["key"]["fromMe"] = True
+
+        response = client.post(
+            f"/webhook/evolution/{WEBHOOK_TOKEN}?agent=rhawk_assistant",
+            json=payload,
+        )
+        assert response.status_code == 200
+        assert response.json() == {"ignored": True}
+        mock_enqueue.assert_not_awaited()
+
+    @patch("whatsapp_langchain.server.routes.webhook_evolution.enqueue_or_buffer")
+    def test_ignores_non_message_events(self, mock_enqueue):
+        """Eventos que não são messages.upsert são ignorados."""
+        response = client.post(
+            f"/webhook/evolution/{WEBHOOK_TOKEN}?agent=rhawk_assistant",
+            json={"event": "connection.update", "data": {}},
+        )
+        assert response.status_code == 200
+        assert response.json() == {"ignored": True}
+        mock_enqueue.assert_not_awaited()
 
 
 class TestAdminRoutes:

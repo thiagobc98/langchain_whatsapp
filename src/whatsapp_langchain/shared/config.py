@@ -40,17 +40,17 @@ class Settings(BaseSettings):
     log_level: str = "info"
     log_json: bool = False  # True em prod para logs estruturados
 
-    # --- Twilio ---
-    # Inbound (validação de assinatura no webhook)
-    validate_twilio_signature: bool = False
-    twilio_auth_token: str = ""
-    twilio_webhook_url: str = ""
-
-    # Outbound (envio de mensagens pelo worker via API Key)
-    twilio_account_sid: str = ""
-    twilio_api_key_sid: str = ""
-    twilio_api_key_secret: str = ""
-    twilio_from_number: str = ""
+    # --- Evolution API (WhatsApp) ---
+    # URL base da instância Evolution API na sua VPS (ex: https://evo.seudominio.com)
+    evolution_base_url: str = ""
+    # apikey da instância (Settings -> API Key no manager, ou definida na criação)
+    evolution_api_key: str = ""
+    # Nome da instância conectada ao WhatsApp
+    evolution_instance: str = ""
+    # Token secreto próprio (não vem do Evolution) usado para validar que o
+    # POST em /webhook/evolution/{token} realmente veio da sua instância —
+    # o Evolution não assina os webhooks como o Twilio faz.
+    evolution_webhook_token: str = ""
 
     # --- Rate Limit ---
     rate_limit_per_hour: int = 30

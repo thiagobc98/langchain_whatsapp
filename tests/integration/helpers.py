@@ -52,8 +52,8 @@ def unique_phone(ddd: str = "99") -> str:
     return f"+55{ddd}{uuid.uuid4().int % 10**8:08d}"
 
 
-def unique_sid(prefix: str = "SM") -> str:
-    """Gera MessageSid único no formato do Twilio."""
+def unique_sid(prefix: str = "MSG") -> str:
+    """Gera um message_id externo único para testes."""
     return f"{prefix}{uuid.uuid4().hex[:12]}"
 
 
@@ -267,24 +267,51 @@ def wait_queue_done(
 # ---------------------------------------------------------------------------
 
 
+def get_evolution_webhook_token() -> str:
+    """Token secreto do webhook Evolution (mesmo .env usado pela stack Docker)."""
+    return os.getenv("EVOLUTION_WEBHOOK_TOKEN", "")
+
+
 def send_webhook(
     phone: str,
     body: str,
     agent: str = "rhawk_assistant",
     message_sid: str | None = None,
+    media_base64: str | None = None,
+    media_type: str | None = None,
     timeout: int = 10,
 ) -> httpx.Response:
-    """Envia POST para /webhook/twilio simulando mensagem do Twilio."""
+    """Envia POST para /webhook/evolution simulando um evento do Evolution API."""
     sid = message_sid or unique_sid()
-    return httpx.post(
-        f"{API_BASE_URL}/webhook/twilio?agent={agent}",
-        data={
-            "MessageSid": sid,
-            "From": f"whatsapp:{phone}",
-            "To": "whatsapp:+14155238886",
-            "Body": body,
-            "NumMedia": "0",
+    remote_jid = f"{phone.lstrip('+')}@s.whatsapp.net"
+
+    if media_base64 and media_type:
+        media_key = (
+            "imageMessage" if media_type.startswith("image/") else "audioMessage"
+        )
+        message: dict = {
+            media_key: {"mimetype": media_type, "caption": body},
+            "base64": media_base64,
+        }
+        message_type = media_key
+    else:
+        message = {"conversation": body}
+        message_type = "conversation"
+
+    payload = {
+        "event": "messages.upsert",
+        "instance": "test",
+        "data": {
+            "key": {"remoteJid": remote_jid, "fromMe": False, "id": sid},
+            "message": message,
+            "messageType": message_type,
         },
+    }
+
+    token = get_evolution_webhook_token()
+    return httpx.post(
+        f"{API_BASE_URL}/webhook/evolution/{token}?agent={agent}",
+        json=payload,
         timeout=timeout,
     )
 

@@ -74,16 +74,16 @@ class TestProcessorMemoryFlag:
                 incoming_message="Olá!",
             )
 
-            mock_twilio = AsyncMock()
-            mock_twilio.send_typing = AsyncMock(return_value=True)
-            mock_twilio.send_message = AsyncMock(return_value="SM123")
+            mock_evolution = AsyncMock()
+            mock_evolution.send_typing = AsyncMock(return_value=True)
+            mock_evolution.send_message = AsyncMock(return_value="MSG123")
 
             await process_message(
                 message,
                 AsyncMock(),
                 checkpointer=mock_checkpointer,
                 store=None,
-                twilio=mock_twilio,
+                evolution=mock_evolution,
             )
 
             mock_preprocess.assert_awaited_once()

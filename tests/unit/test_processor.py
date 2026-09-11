@@ -12,8 +12,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from whatsapp_langchain.shared.models import MessageQueue
+from whatsapp_langchain.worker.evolution_client import EvolutionSendError
 from whatsapp_langchain.worker.media import MediaPreprocessResult
-from whatsapp_langchain.worker.twilio_client import TwilioSendError
 
 # --- Fixtures ---
 
@@ -23,7 +23,7 @@ def message():
     """Mensagem de texto padrão para testes."""
     return MessageQueue(
         id=1,
-        message_id="SM123",
+        message_id="MSG123",
         phone_number="+5511999999999",
         agent_id="rhawk_assistant",
         thread_id="+5511999999999:rhawk_assistant",
@@ -36,23 +36,23 @@ def media_message():
     """Mensagem com mídia desabilitada/falha para testar auto-response."""
     return MessageQueue(
         id=2,
-        message_id="MM456",
+        message_id="MSG456",
         phone_number="+5511999999999",
         agent_id="rhawk_assistant",
         thread_id="+5511999999999:rhawk_assistant",
         incoming_message="",
-        media_url="https://api.twilio.com/media/test.jpg",
+        media_base64="aGVsbG8=",
         media_type="image/jpeg",
     )
 
 
 @pytest.fixture
-def mock_twilio():
-    """TwilioClient mock com send_message e send_typing."""
-    twilio = AsyncMock()
-    twilio.send_typing = AsyncMock(return_value=True)
-    twilio.send_message = AsyncMock(return_value="SM_RESPONSE_123")
-    return twilio
+def mock_evolution():
+    """EvolutionClient mock com send_message e send_typing."""
+    evolution = AsyncMock()
+    evolution.send_typing = AsyncMock(return_value=True)
+    evolution.send_message = AsyncMock(return_value="MSG_RESPONSE_123")
+    return evolution
 
 
 # --- Helpers ---
@@ -102,7 +102,7 @@ MEDIA_DISABLED_PREPROCESS = MediaPreprocessResult(
 class TestSendMessageMarkDone:
     """Garante que mark_done só ocorre após send_message bem-sucedido."""
 
-    async def test_mark_done_after_successful_send(self, message, mock_twilio):
+    async def test_mark_done_after_successful_send(self, message, mock_evolution):
         """Fluxo feliz: send_message ok → mark_done chamado."""
         patches = _patch_processor(TEXT_PREPROCESS)
         with (
@@ -124,11 +124,11 @@ class TestSendMessageMarkDone:
                 message,
                 AsyncMock(),
                 checkpointer=AsyncMock(),
-                twilio=mock_twilio,
+                evolution=mock_evolution,
             )
 
             # send_message chamado com a resposta do agente
-            mock_twilio.send_message.assert_awaited_once_with(
+            mock_evolution.send_message.assert_awaited_once_with(
                 "+5511999999999", "Resposta do agente"
             )
             # mark_done chamado
@@ -136,10 +136,10 @@ class TestSendMessageMarkDone:
             # mark_failed NÃO chamado
             mock_failed.assert_not_awaited()
 
-    async def test_mark_done_not_called_when_send_fails(self, message, mock_twilio):
+    async def test_mark_done_not_called_when_send_fails(self, message, mock_evolution):
         """send_message falha → mark_done NÃO é chamado, mark_failed SIM."""
-        mock_twilio.send_message = AsyncMock(
-            side_effect=TwilioSendError(500, "Internal Server Error")
+        mock_evolution.send_message = AsyncMock(
+            side_effect=EvolutionSendError(500, "Internal Server Error")
         )
 
         patches = _patch_processor(TEXT_PREPROCESS)
@@ -162,11 +162,11 @@ class TestSendMessageMarkDone:
                 message,
                 AsyncMock(),
                 checkpointer=AsyncMock(),
-                twilio=mock_twilio,
+                evolution=mock_evolution,
             )
 
             # send_message foi chamado (e falhou)
-            mock_twilio.send_message.assert_awaited_once()
+            mock_evolution.send_message.assert_awaited_once()
             # mark_done NÃO chamado
             mock_done.assert_not_awaited()
             # mark_failed chamado com o erro
@@ -174,9 +174,9 @@ class TestSendMessageMarkDone:
             error_arg = mock_failed.call_args[0][2]
             assert "500" in error_arg
 
-    async def test_mark_failed_on_generic_send_exception(self, message, mock_twilio):
+    async def test_mark_failed_on_generic_send_exception(self, message, mock_evolution):
         """Exceção genérica no send_message → mark_failed."""
-        mock_twilio.send_message = AsyncMock(
+        mock_evolution.send_message = AsyncMock(
             side_effect=Exception("Connection timeout")
         )
 
@@ -200,7 +200,7 @@ class TestSendMessageMarkDone:
                 message,
                 AsyncMock(),
                 checkpointer=AsyncMock(),
-                twilio=mock_twilio,
+                evolution=mock_evolution,
             )
 
             mock_done.assert_not_awaited()
@@ -211,11 +211,13 @@ class TestSendMessageMarkDone:
 # === Testes do fluxo auto-response (mídia) ===
 
 
-class TestAutoResponseTwilio:
-    """Garante que auto-response de mídia também envia via Twilio antes de mark_done."""
+class TestAutoResponseEvolution:
+    """Garante que auto-response de mídia também envia antes de mark_done."""
 
-    async def test_auto_response_sends_via_twilio(self, media_message, mock_twilio):
-        """Auto-response de mídia desabilitada envia via Twilio antes de mark_done."""
+    async def test_auto_response_sends_via_evolution(
+        self, media_message, mock_evolution
+    ):
+        """Auto-response de mídia desabilitada envia antes de mark_done."""
         patches = _patch_processor(MEDIA_DISABLED_PREPROCESS)
         with (
             patches[0],
@@ -230,11 +232,11 @@ class TestAutoResponseTwilio:
                 media_message,
                 AsyncMock(),
                 checkpointer=AsyncMock(),
-                twilio=mock_twilio,
+                evolution=mock_evolution,
             )
 
-            # Auto-response enviada via Twilio
-            mock_twilio.send_message.assert_awaited_once_with(
+            # Auto-response enviada via Evolution
+            mock_evolution.send_message.assert_awaited_once_with(
                 "+5511999999999",
                 "Imagens estão desabilitadas neste momento.",
             )
@@ -243,11 +245,11 @@ class TestAutoResponseTwilio:
             mock_failed.assert_not_awaited()
 
     async def test_auto_response_mark_failed_when_send_fails(
-        self, media_message, mock_twilio
+        self, media_message, mock_evolution
     ):
         """Auto-response falha no envio → mark_failed (retry)."""
-        mock_twilio.send_message = AsyncMock(
-            side_effect=TwilioSendError(503, "Service Unavailable")
+        mock_evolution.send_message = AsyncMock(
+            side_effect=EvolutionSendError(503, "Service Unavailable")
         )
 
         patches = _patch_processor(MEDIA_DISABLED_PREPROCESS)
@@ -264,11 +266,11 @@ class TestAutoResponseTwilio:
                 media_message,
                 AsyncMock(),
                 checkpointer=AsyncMock(),
-                twilio=mock_twilio,
+                evolution=mock_evolution,
             )
 
             # send_message foi chamado (e falhou)
-            mock_twilio.send_message.assert_awaited_once()
+            mock_evolution.send_message.assert_awaited_once()
             # mark_done NÃO chamado
             mock_done.assert_not_awaited()
             # mark_failed chamado

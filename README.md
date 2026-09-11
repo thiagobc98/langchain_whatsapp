@@ -17,7 +17,7 @@ O objetivo deste repositório é ensinar arquitetura de sistemas em volta do age
 **Fase 4 concluída no código.**
 
 Já implementado no código:
-- API FastAPI com webhook Twilio assíncrono (`/webhook/twilio`)
+- API FastAPI com webhook Evolution API assíncrono (`/webhook/evolution/{token}`)
 - fila em PostgreSQL com debounce e retry
 - worker assíncrono para processamento LangGraph
 - bootstrap de schema LangGraph no startup (sem criação lazy no primeiro request)
@@ -31,12 +31,12 @@ Já implementado no código:
 - rotas administrativas (`/api/agents`, `/api/chats`, `/api/metrics`) protegidas por login
 - admin panel (Next.js) em `frontend/`: dashboard, conversas e agentes
 - endpoint síncrono educacional (`/webhook/sync`)
-- validação criptográfica de `X-Twilio-Signature`
-- envio real de resposta via Twilio Messages API
-- typing indicator via Twilio antes do processamento
+- validação do webhook via token secreto no path (Evolution não assina requests)
+- envio real de resposta via Evolution API (self-hosted)
+- typing indicator via Evolution API antes do processamento
 - deploy via Docker Compose com proxy reverso (Caddy) e TLS automático
 - stress test com Locust (`tests/stress/`)
-- documentação de sandbox/webhook/túnel com cloudflared
+- documentação de setup do Evolution API e túnel com cloudflared
 
 ## Arquitetura
 
@@ -45,7 +45,7 @@ Já implementado no código:
 Fluxo principal:
 
 ```text
-WhatsApp/Twilio -> API (/webhook/twilio) -> PostgreSQL (message_queue)
+WhatsApp/Evolution API -> API (/webhook/evolution/{token}) -> PostgreSQL (message_queue)
                                               -> Worker -> LangGraph Agent
                                               -> PostgreSQL (response, conversation)
 ```
@@ -107,15 +107,20 @@ curl -X POST "http://localhost:8000/webhook/sync?agent=rhawk_assistant" \
   -d '{"phone":"+5511999999999","message":"Olá!"}'
 ```
 
-### 5. Teste assíncrono (simulando Twilio)
+### 5. Teste assíncrono (simulando Evolution API)
 
 ```bash
-curl -X POST "http://localhost:8000/webhook/twilio?agent=rhawk_assistant" \
-  -d "MessageSid=SM123" \
-  -d "From=whatsapp:+5511999999999" \
-  -d "To=whatsapp:+14155238886" \
-  -d "Body=Quero aprender sistemas de agentes" \
-  -d "NumMedia=0"
+curl -X POST "http://localhost:8000/webhook/evolution/SEU_TOKEN?agent=rhawk_assistant" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "event": "messages.upsert",
+    "instance": "minha-instancia",
+    "data": {
+      "key": {"remoteJid": "5511999999999@s.whatsapp.net", "fromMe": false, "id": "MSG123"},
+      "message": {"conversation": "Quero aprender sistemas de agentes"},
+      "messageType": "conversation"
+    }
+  }'
 ```
 
 Acompanhe métricas (rotas `/api/*` exigem sessão de admin — use um cookie
@@ -165,7 +170,7 @@ Para detalhes técnicos:
 - [Primeiros Passos](docs/GETTING_STARTED.md)
 - [Criando Agentes](docs/ADDING_AGENTS.md)
 - [Banco de Dados](docs/DATABASE.md)
-- [Integração Twilio](docs/TWILIO.md)
+- [Integração Evolution API](docs/EVOLUTION_API.md)
 - [Google Calendar (agendamento)](docs/GOOGLE_CALENDAR.md)
 - [Deploy](docs/DEPLOY.md)
 
@@ -193,7 +198,7 @@ make stress
 
 - **Fase 1** concluída: base de agentes + middleware de contexto
 - **Fase 2** concluída: API + Worker + PostgreSQL + observabilidade operacional
-- **Fase 3** concluída: integração Twilio + assinatura real + typing + reforço dos testes de debounce
+- **Fase 3** concluída: integração WhatsApp (Evolution API) + typing + reforço dos testes de debounce
 - **Fase 4** concluída: admin panel (Next.js) + deploy (Docker Compose + Caddy/TLS) + stress test (Locust) + hardening (rate limit distribuído via Redis, auth do admin panel, containers non-root)
 
 ## Licença

@@ -7,7 +7,7 @@ reverso com TLS, prontos para uma VPS via Docker Compose.
 ## Escopo desta fase
 
 Incluído:
-- tudo da Fase 2/3 (webhook Twilio real, fila, worker, checkpointer, memória)
+- tudo da Fase 2/3 (webhook Evolution API real, fila, worker, checkpointer, memória)
 - Admin Panel (Next.js) com login e sessão
 - rotas `/api/*` protegidas por autenticação (cookie de sessão)
 - rate limit distribuído via Redis (substitui o rate limit em memória)
@@ -79,7 +79,7 @@ Veja `.env.example` para a lista completa.
 4. Verificar `curl -I https://$DOMAIN/health` (API) e
    `curl -I https://$DOMAIN/` (frontend).
 5. Acessar `https://$DOMAIN/login` e autenticar com `ADMIN_USERNAME`/`ADMIN_PASSWORD`.
-6. Enviar mensagem de teste real via WhatsApp/Twilio.
+6. Enviar mensagem de teste real via WhatsApp/Evolution API.
 7. Acompanhar `/api/metrics` (autenticado) e logs.
 
 ## Deploy com Docker

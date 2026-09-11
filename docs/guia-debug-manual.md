@@ -32,23 +32,33 @@ Você verá todos os endpoints documentados com formulários interativos.
 
 ## Passo 2: Enviar uma Mensagem via Webhook
 
-1. No Swagger, localize **POST /webhook/twilio**
+1. No Swagger, localize **POST /webhook/evolution/{token}**
 2. Clique em **Try it out**
-3. No campo `agent` (query param), digite: `rhawk_assistant`
-4. No corpo (form data), preencha:
+3. No campo `token` (path param), digite o mesmo valor de
+   `EVOLUTION_WEBHOOK_TOKEN` do seu `.env`
+4. No campo `agent` (query param), digite: `rhawk_assistant`
+5. No corpo (JSON), preencha:
 
-| Campo | Valor |
-|---|---|
-| `MessageSid` | `SM_TESTE_001` |
-| `From` | `whatsapp:+5511999990001` |
-| `To` | `whatsapp:+14155238886` |
-| `Body` | `Olá! O que vocês fazem?` |
-| `NumMedia` | `0` |
+```json
+{
+  "event": "messages.upsert",
+  "instance": "minha-instancia",
+  "data": {
+    "key": {
+      "remoteJid": "5511999990001@s.whatsapp.net",
+      "fromMe": false,
+      "id": "MSG_TESTE_001"
+    },
+    "message": {"conversation": "Olá! O que vocês fazem?"},
+    "messageType": "conversation"
+  }
+}
+```
 
-5. Clique em **Execute**
-6. A resposta deve ser **200** com TwiML vazio:
-   ```xml
-   <?xml version="1.0" encoding="UTF-8"?><Response></Response>
+6. Clique em **Execute**
+7. A resposta deve ser **200**:
+   ```json
+   {"received": true}
    ```
 
 > O 200 significa apenas que a mensagem foi **enfileirada**. O processamento
@@ -69,7 +79,7 @@ docker compose exec db psql -U postgres -d whatsapp_langchain
 ```sql
 SELECT id, phone_number, agent_id, status, incoming_message, response, error
 FROM message_queue
-WHERE message_id = 'SM_TESTE_001';
+WHERE message_id = 'MSG_TESTE_001';
 ```
 
 **O que observar:**
@@ -88,7 +98,7 @@ WHERE message_id = 'SM_TESTE_001';
 ```sql
 SELECT incoming_message, response, processed_at
 FROM message_queue
-WHERE message_id = 'SM_TESTE_001' AND status = 'done';
+WHERE message_id = 'MSG_TESTE_001' AND status = 'done';
 ```
 
 ### 3.3 — Ver a conversa criada
@@ -105,13 +115,14 @@ WHERE phone_number = '+5511999990001';
 
 ## Passo 4: Enviar Follow-up (Conversa Multi-turno)
 
-Volte ao Swagger e envie outra mensagem do **mesmo telefone**:
+Volte ao Swagger e envie outra mensagem do **mesmo telefone** (troque só
+`key.id` e `message.conversation` no JSON do Passo 2):
 
 | Campo | Valor |
 |---|---|
-| `MessageSid` | `SM_TESTE_002` |
-| `From` | `whatsapp:+5511999990001` |
-| `Body` | `Como posso aprender mais sobre agentes?` |
+| `key.id` | `MSG_TESTE_002` |
+| `key.remoteJid` | `5511999990001@s.whatsapp.net` |
+| `message.conversation` | `Como posso aprender mais sobre agentes?` |
 
 Depois verifique:
 
@@ -130,12 +141,12 @@ SELECT message_count FROM conversations WHERE phone_number = '+5511999990001';
 
 ## Passo 5: Testar o Debounce
 
-Envie **3 mensagens rápidas** (uma atrás da outra, sem esperar) com o mesmo telefone
-e **MessageSids diferentes**:
+Envie **3 mensagens rápidas** (uma atrás da outra, sem esperar) com o mesmo
+telefone (`5511999990002@s.whatsapp.net`) e **ids diferentes**:
 
-1. `SM_DEB_01` — Body: `Oi`
-2. `SM_DEB_02` — Body: `Tudo bem?`
-3. `SM_DEB_03` — Body: `Quero saber sobre LangGraph`
+1. `MSG_DEB_01` — texto: `Oi`
+2. `MSG_DEB_02` — texto: `Tudo bem?`
+3. `MSG_DEB_03` — texto: `Quero saber sobre LangGraph`
 
 Depois verifique:
 
@@ -168,9 +179,9 @@ Envie via Swagger:
 
 | Campo | Valor |
 |---|---|
-| `MessageSid` | `SM_MEM_01` |
-| `From` | `whatsapp:+5511999990003` |
-| `Body` | `Use save_memory e salve: meu código secreto é ALPHA-7742` |
+| `key.id` | `MSG_MEM_01` |
+| `key.remoteJid` | `5511999990003@s.whatsapp.net` |
+| `message.conversation` | `Use save_memory e salve: meu código secreto é ALPHA-7742` |
 
 Aguarde `status = done`, depois verifique no store:
 
@@ -193,15 +204,15 @@ Envie nova mensagem pedindo recall:
 
 | Campo | Valor |
 |---|---|
-| `MessageSid` | `SM_MEM_02` |
-| `From` | `whatsapp:+5511999990003` |
-| `Body` | `Use read_memory e me diga qual é meu código secreto` |
+| `key.id` | `MSG_MEM_02` |
+| `key.remoteJid` | `5511999990003@s.whatsapp.net` |
+| `message.conversation` | `Use read_memory e me diga qual é meu código secreto` |
 
 Verifique se a resposta contém `ALPHA-7742`:
 
 ```sql
 SELECT response FROM message_queue
-WHERE message_id = 'SM_MEM_02' AND status = 'done';
+WHERE message_id = 'MSG_MEM_02' AND status = 'done';
 ```
 
 ---

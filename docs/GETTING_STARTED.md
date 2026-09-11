@@ -10,7 +10,7 @@ Este guia tem duas trilhas:
 - `uv` (gerenciador de pacotes)
 - Docker + Docker Compose
 - conta OpenRouter (API key)
-- conta Twilio com sandbox WhatsApp (obrigatória para o Worker — veja [Integração Twilio](TWILIO.md), seções 1.1 e 1.2 para criação de conta/credenciais)
+- instância Evolution API rodando (obrigatória para o Worker — veja [Evolution API](EVOLUTION_API.md) para setup completo)
 
 ## 1. Setup local
 
@@ -27,11 +27,11 @@ Edite `.env` e configure no mínimo:
 OPENROUTER_API_KEY=sk-or-v1-...
 OPENROUTER_MIDIA_MODEL=google/gemini-2.5-flash-lite
 
-# Twilio (obrigatório para o Worker)
-TWILIO_ACCOUNT_SID=ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-TWILIO_API_KEY_SID=SKxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-TWILIO_API_KEY_SECRET=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-TWILIO_FROM_NUMBER=whatsapp:+14155238886
+# Evolution API (obrigatório para o Worker)
+EVOLUTION_BASE_URL=https://evo.seudominio.com
+EVOLUTION_API_KEY=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+EVOLUTION_INSTANCE=minha-instancia
+EVOLUTION_WEBHOOK_TOKEN=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 ```
 
 ## 2. Trilha A: desenvolvimento de agente no Studio
@@ -96,12 +96,17 @@ Use para debugging rápido sem fila.
 ### 4.2 Webhook assíncrono (arquitetura real)
 
 ```bash
-curl -X POST "http://localhost:8000/webhook/twilio?agent=rhawk_assistant" \
-  -d "MessageSid=SM123" \
-  -d "From=whatsapp:+5511999999999" \
-  -d "To=whatsapp:+14155238886" \
-  -d "Body=Mensagem de teste" \
-  -d "NumMedia=0"
+curl -X POST "http://localhost:8000/webhook/evolution/SEU_TOKEN?agent=rhawk_assistant" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "event": "messages.upsert",
+    "instance": "minha-instancia",
+    "data": {
+      "key": {"remoteJid": "5511999999999@s.whatsapp.net", "fromMe": false, "id": "MSG123"},
+      "message": {"conversation": "Mensagem de teste"},
+      "messageType": "conversation"
+    }
+  }'
 ```
 
 Depois consulte:
@@ -116,16 +121,13 @@ curl http://localhost:8000/api/chats/+5511999999999
 
 1. Abra `http://localhost:8000/docs`.
 2. Execute `GET /api/agents` e confirme `rhawk_assistant`.
-3. Abra `POST /webhook/twilio` e clique em `Try it out`.
+3. Abra `POST /webhook/evolution/{token}` e clique em `Try it out`.
 4. Preencha:
+   - `token` (path): o mesmo valor de `EVOLUTION_WEBHOOK_TOKEN` no `.env`
    - `agent` (query): `rhawk_assistant`
-   - `MessageSid`: `SMDOCS001`
-   - `From`: `whatsapp:+5511999999999`
-   - `To`: `whatsapp:+14155238886`
-   - `Body`: `Mensagem de teste via Swagger`
-   - `NumMedia`: `0`
+   - body: o JSON de exemplo da seção 4.2, trocando o texto da mensagem
 5. Execute e verifique:
-   - resposta `200` com TwiML vazio
+   - resposta `200` com `{"received": true}`
    - dados em `GET /api/chats/+5511999999999`
 
 ### 4.3 Teste de memória semântica (save + recall via tools)
@@ -133,23 +135,33 @@ curl http://localhost:8000/api/chats/+5511999999999
 1. Envie uma mensagem pedindo para salvar um fato:
 
 ```bash
-curl -X POST "http://localhost:8000/webhook/twilio?agent=rhawk_assistant" \
-  -d "MessageSid=SMMEM001" \
-  -d "From=whatsapp:+5511999999999" \
-  -d "To=whatsapp:+14155238886" \
-  -d "Body=Use a ferramenta save_memory e salve este fato: meu código é codex-12345" \
-  -d "NumMedia=0"
+curl -X POST "http://localhost:8000/webhook/evolution/SEU_TOKEN?agent=rhawk_assistant" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "event": "messages.upsert",
+    "instance": "minha-instancia",
+    "data": {
+      "key": {"remoteJid": "5511999999999@s.whatsapp.net", "fromMe": false, "id": "MSGMEM001"},
+      "message": {"conversation": "Use a ferramenta save_memory e salve este fato: meu código é codex-12345"},
+      "messageType": "conversation"
+    }
+  }'
 ```
 
 2. Envie outra mensagem pedindo recall explícito:
 
 ```bash
-curl -X POST "http://localhost:8000/webhook/twilio?agent=rhawk_assistant" \
-  -d "MessageSid=SMMEM002" \
-  -d "From=whatsapp:+5511999999999" \
-  -d "To=whatsapp:+14155238886" \
-  -d "Body=Sem salvar nada novo agora, use read_memory e me diga meu código" \
-  -d "NumMedia=0"
+curl -X POST "http://localhost:8000/webhook/evolution/SEU_TOKEN?agent=rhawk_assistant" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "event": "messages.upsert",
+    "instance": "minha-instancia",
+    "data": {
+      "key": {"remoteJid": "5511999999999@s.whatsapp.net", "fromMe": false, "id": "MSGMEM002"},
+      "message": {"conversation": "Sem salvar nada novo agora, use read_memory e me diga meu código"},
+      "messageType": "conversation"
+    }
+  }'
 ```
 
 3. Verifique evidências no banco:
@@ -261,7 +273,7 @@ grep OPENROUTER_API_KEY .env
 
 ## Próximos passos
 
-- [Integração Twilio](TWILIO.md)
+- [Evolution API](EVOLUTION_API.md)
 - [Arquitetura](ARCHITECTURE.md)
 - [Criando Agentes](ADDING_AGENTS.md)
 - [Banco de Dados](DATABASE.md)

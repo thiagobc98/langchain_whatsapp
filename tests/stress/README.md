@@ -1,15 +1,15 @@
 # Stress Test (Locust)
 
-Simula carga concorrente em `/webhook/twilio` para validar o pipeline
-completo sob pressão: rate limit (Redis), debounce/fila (PostgreSQL) e
-worker.
+Simula carga concorrente em `/webhook/evolution/{token}` para validar o
+pipeline completo sob pressão: rate limit (Redis), debounce/fila
+(PostgreSQL) e worker.
 
 ## Pré-requisitos
 
 1. Stack local rodando: `make up`
-2. `VALIDATE_TWILIO_SIGNATURE=false` no `.env` — o Locust não consegue
-   gerar assinatura HMAC-SHA1 válida do Twilio, então com validação
-   habilitada todas as requisições seriam rejeitadas com 403.
+2. `LOCUST_WEBHOOK_TOKEN` (ou `EVOLUTION_WEBHOOK_TOKEN`) definido no
+   ambiente com o mesmo valor configurado no `.env` da stack — sem o
+   token correto, todas as requisições são rejeitadas com 403.
 3. **Nunca rode contra produção.**
 
 ## Rodando

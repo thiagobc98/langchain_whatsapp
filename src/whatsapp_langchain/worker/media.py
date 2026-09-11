@@ -47,24 +47,9 @@ class MediaPreprocessResult:
     auto_response: str | None = None
 
 
-async def download_media(
-    url: str,
-) -> bytes:
-    """Faz download de mídia do Twilio.
-
-    Autentica com API Key (api_key_sid:api_key_secret) — mesmas credenciais
-    usadas pelo TwilioClient para envio outbound.
-    """
-    auth = (
-        (settings.twilio_api_key_sid, settings.twilio_api_key_secret)
-        if settings.twilio_api_key_sid
-        else None
-    )
-
-    async with httpx.AsyncClient() as client:
-        response = await client.get(url, auth=auth, follow_redirects=True)
-        response.raise_for_status()
-        return response.content
+def decode_media_base64(data: str) -> bytes:
+    """Decodifica mídia recebida em base64 (Evolution API, webhookBase64=true)."""
+    return base64.b64decode(data)
 
 
 def _media_kind(media_type: str | None) -> str:
@@ -212,11 +197,11 @@ async def _transcribe_audio(media_bytes: bytes, media_type: str) -> str:
 
 async def preprocess_incoming_message(
     body: str,
-    media_url: str | None = None,
+    media_base64: str | None = None,
     media_type: str | None = None,
 ) -> MediaPreprocessResult:
     """Normaliza entrada para texto antes da chamada ao agente."""
-    if not media_url and not media_type:
+    if not media_base64 and not media_type:
         return MediaPreprocessResult(
             should_invoke_agent=True,
             normalized_text=body,
@@ -224,7 +209,7 @@ async def preprocess_incoming_message(
         )
 
     # Payload de mídia incompleto: não invoca agente.
-    if not media_url or not media_type:
+    if not media_base64 or not media_type:
         return MediaPreprocessResult(
             should_invoke_agent=False,
             normalized_text=None,
@@ -259,7 +244,7 @@ async def preprocess_incoming_message(
         )
 
     try:
-        media_bytes = await download_media(media_url)
+        media_bytes = decode_media_base64(media_base64)
 
         if kind == "image":
             description = await _describe_image(media_bytes, media_type)
@@ -309,13 +294,13 @@ async def preprocess_incoming_message(
 
 async def build_human_message(
     body: str,
-    media_url: str | None = None,
+    media_base64: str | None = None,
     media_type: str | None = None,
 ) -> HumanMessage:
     """Compatibilidade: retorna HumanMessage de texto (sem multimodal)."""
     pre = await preprocess_incoming_message(
         body=body,
-        media_url=media_url,
+        media_base64=media_base64,
         media_type=media_type,
     )
     text = pre.normalized_text or body or pre.auto_response or ""

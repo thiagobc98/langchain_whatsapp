@@ -32,6 +32,7 @@ async def enqueue_or_buffer(
     agent_id: str,
     body: str,
     media_url: str | None = None,
+    media_base64: str | None = None,
     media_type: str | None = None,
     to_number: str | None = None,
     message_id: str | None = None,
@@ -40,30 +41,31 @@ async def enqueue_or_buffer(
     """Insere mensagem na fila ou agrupa com mensagem pendente (debounce).
 
     Regras de debounce (Fase 3):
-    - Debounce somente para texto (media_url IS NULL).
+    - Debounce somente para texto (sem mídia).
     - Mensagem com mídia não faz debounce (entrada imediata).
     - Antes de inserir mídia, flush de texto pendente do mesmo phone+agent
       para que o worker processe o texto ANTES da mídia (ordenação por created_at).
     - Concorrência protegida por pg_advisory_xact_lock(hash(phone+agent)).
 
-    Limitação conhecida: NumMedia > 1 no mesmo webhook fica fora do escopo.
+    Limitação conhecida: múltiplas mídias no mesmo webhook ficam fora do escopo.
 
     Args:
         pool: Pool de conexões do psycopg.
         phone_number: Telefone do remetente (E.164).
         agent_id: ID do agente que vai processar.
         body: Texto da mensagem.
-        media_url: URL de mídia anexada (opcional).
+        media_url: URL de mídia anexada (opcional, provedores baseados em URL).
+        media_base64: Conteúdo de mídia em base64 (opcional, Evolution API).
         media_type: MIME type da mídia (opcional).
         to_number: Número destinatário (opcional).
-        message_id: ID externo da mensagem, ex: Twilio MessageSid (opcional).
+        message_id: ID externo da mensagem (opcional).
         buffer_seconds: Segundos de debounce. Default: 2.0.
 
     Returns:
         EnqueueResult com message_id e se foi buffered.
     """
     thread_id = f"{phone_number}:{agent_id}"
-    has_media = media_url is not None
+    has_media = media_url is not None or media_base64 is not None
 
     # Hash determinístico para pg_advisory_xact_lock.
     # Usa os 8 bytes iniciais do SHA-256 convertidos para int64 signed,
@@ -93,6 +95,7 @@ async def enqueue_or_buffer(
                   AND status = 'queued'
                   AND process_after > NOW()
                   AND media_url IS NULL
+                  AND media_base64 IS NULL
                 """,
                 (phone_number, agent_id),
             )
@@ -109,9 +112,9 @@ async def enqueue_or_buffer(
                 """
                 INSERT INTO message_queue
                     (message_id, phone_number, to_number, agent_id,
-                     thread_id, incoming_message, media_url, media_type,
-                     process_after)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, NOW())
+                     thread_id, incoming_message, media_url, media_base64,
+                     media_type, process_after)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
                 RETURNING id
                 """,
                 (
@@ -122,6 +125,7 @@ async def enqueue_or_buffer(
                     thread_id,
                     body,
                     media_url,
+                    media_base64,
                     media_type,
                 ),
             )
@@ -141,8 +145,8 @@ async def enqueue_or_buffer(
         # Texto: debounce normal (agrupa com texto pendente se existir)
         process_after = datetime.now(UTC) + timedelta(seconds=buffer_seconds)
 
-        # Busca texto pendente para debounce (media_url IS NULL garante
-        # que não debounce texto dentro de uma mensagem de mídia)
+        # Busca texto pendente para debounce (sem mídia garante que não
+        # debounce texto dentro de uma mensagem de mídia)
         cursor = await conn.execute(
             """
             SELECT id, incoming_message
@@ -152,6 +156,7 @@ async def enqueue_or_buffer(
               AND status = 'queued'
               AND process_after > NOW()
               AND media_url IS NULL
+              AND media_base64 IS NULL
             ORDER BY created_at DESC
             LIMIT 1
             """,
@@ -189,8 +194,9 @@ async def enqueue_or_buffer(
             """
             INSERT INTO message_queue
                 (message_id, phone_number, to_number, agent_id, thread_id,
-                 incoming_message, media_url, media_type, process_after)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                 incoming_message, media_url, media_base64, media_type,
+                 process_after)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING id
             """,
             (
@@ -200,6 +206,7 @@ async def enqueue_or_buffer(
                 agent_id,
                 thread_id,
                 body,
+                None,
                 None,
                 None,
                 process_after,
@@ -283,7 +290,7 @@ async def claim_next(
                 FOR UPDATE SKIP LOCKED
             )
             RETURNING id, message_id, phone_number, to_number, agent_id, thread_id,
-                      incoming_message, media_url, media_type,
+                      incoming_message, media_url, media_base64, media_type,
                       normalized_input, media_processing_status, media_processing_error,
                       status,
                       process_after, attempts, max_attempts, lease_until,
@@ -306,20 +313,21 @@ async def claim_next(
             thread_id=row[5],
             incoming_message=row[6],
             media_url=row[7],
-            media_type=row[8],
-            normalized_input=row[9],
-            media_processing_status=row[10],
-            media_processing_error=row[11],
-            status=row[12],
-            process_after=row[13],
-            attempts=row[14],
-            max_attempts=row[15],
-            lease_until=row[16],
-            response=row[17],
-            error=row[18],
-            created_at=row[19],
-            updated_at=row[20],
-            processed_at=row[21],
+            media_base64=row[8],
+            media_type=row[9],
+            normalized_input=row[10],
+            media_processing_status=row[11],
+            media_processing_error=row[12],
+            status=row[13],
+            process_after=row[14],
+            attempts=row[15],
+            max_attempts=row[16],
+            lease_until=row[17],
+            response=row[18],
+            error=row[19],
+            created_at=row[20],
+            updated_at=row[21],
+            processed_at=row[22],
         )
 
         logger.info(
