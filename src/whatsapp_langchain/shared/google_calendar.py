@@ -34,6 +34,13 @@ logger = structlog.get_logger()
 
 SCOPES = ["https://www.googleapis.com/auth/calendar"]
 
+# O client da Calendar API (via _build_service, cacheado) reusa uma única
+# conexão HTTP (httplib2) por baixo do googleapiclient — não é thread-safe
+# para chamadas concorrentes. Duas requisições simultâneas (ex: os dois
+# cards do Dashboard carregando ao mesmo tempo) corrompem a conexão
+# compartilhada. Este lock serializa todas as chamadas de rede à API.
+_CALENDAR_LOCK = asyncio.Lock()
+
 
 class GoogleCalendarNotConfiguredError(Exception):
     """Erro quando a integração com Google Calendar não está configurada."""
@@ -103,7 +110,8 @@ async def get_busy_intervals(
         }
         return service.freebusy().query(body=body).execute()
 
-    result = await asyncio.to_thread(_call)
+    async with _CALENDAR_LOCK:
+        result = await asyncio.to_thread(_call)
     calendars = result.get("calendars", {})
     busy_raw = calendars.get(_calendar_id(), {}).get("busy", [])
 
@@ -168,7 +176,8 @@ async def create_event(
         service = _build_service()
         return service.events().insert(calendarId=_calendar_id(), body=body).execute()
 
-    event = await asyncio.to_thread(_call)
+    async with _CALENDAR_LOCK:
+        event = await asyncio.to_thread(_call)
     logger.info("calendar_event_created", event_id=event.get("id"), phone=phone)
     return event
 
@@ -191,7 +200,8 @@ async def update_event(
             .execute()
         )
 
-    event = await asyncio.to_thread(_call)
+    async with _CALENDAR_LOCK:
+        event = await asyncio.to_thread(_call)
     logger.info("calendar_event_updated", event_id=event_id)
     return event
 
@@ -203,8 +213,37 @@ async def delete_event(event_id: str) -> None:
         service = _build_service()
         service.events().delete(calendarId=_calendar_id(), eventId=event_id).execute()
 
-    await asyncio.to_thread(_call)
+    async with _CALENDAR_LOCK:
+        await asyncio.to_thread(_call)
     logger.info("calendar_event_deleted", event_id=event_id)
+
+
+async def list_events(time_min: datetime, time_max: datetime) -> list[dict[str, Any]]:
+    """Lista todos os eventos do calendário entre time_min e time_max.
+
+    Usado pela página de Agenda do painel admin (visão semanal).
+    """
+
+    def _call() -> dict:
+        service = _build_service()
+        return (
+            service.events()
+            .list(
+                calendarId=_calendar_id(),
+                timeMin=time_min.isoformat(),
+                timeMax=time_max.isoformat(),
+                singleEvents=True,
+                orderBy="startTime",
+                maxResults=250,
+            )
+            .execute()
+        )
+
+    async with _CALENDAR_LOCK:
+        result = await asyncio.to_thread(_call)
+    return [
+        event for event in result.get("items", []) if event.get("status") != "cancelled"
+    ]
 
 
 async def find_events_by_phone(
@@ -228,7 +267,8 @@ async def find_events_by_phone(
             .execute()
         )
 
-    result = await asyncio.to_thread(_call)
+    async with _CALENDAR_LOCK:
+        result = await asyncio.to_thread(_call)
     return [
         event for event in result.get("items", []) if event.get("status") != "cancelled"
     ]

@@ -10,11 +10,18 @@ Uso:
     curl http://localhost:8000/api/metrics
 """
 
+from datetime import datetime
+
 import structlog
 from fastapi import APIRouter, Query
 
 from whatsapp_langchain.agents.loader import list_agents
+from whatsapp_langchain.shared.config import settings
 from whatsapp_langchain.shared.db import get_pool
+from whatsapp_langchain.shared.google_calendar import (
+    GoogleCalendarNotConfiguredError,
+    list_events,
+)
 
 logger = structlog.get_logger()
 
@@ -190,4 +197,54 @@ async def get_metrics() -> dict:
         "failures_today": failures_today,
         "avg_processing_time_seconds": avg_processing_time,
         "queue_size": queue_size,
+    }
+
+
+@router.get("/calendar/events")
+async def get_calendar_events(
+    start: datetime = Query(description="Início do período (ISO 8601)"),
+    end: datetime = Query(description="Fim do período (ISO 8601)"),
+) -> dict:
+    """Lista os eventos do Google Calendar em um período, para a Agenda do painel.
+
+    Args:
+        start: Início do período (ISO 8601).
+        end: Fim do período (ISO 8601).
+
+    Returns:
+        `enabled=False` quando a integração não está configurada
+        (GOOGLE_CALENDAR_ENABLED ou credenciais ausentes), sem erro —
+        o painel mostra um estado vazio nesse caso.
+    """
+    if not settings.google_calendar_enabled:
+        return {"enabled": False, "events": []}
+
+    try:
+        raw_events = await list_events(start, end)
+    except GoogleCalendarNotConfiguredError:
+        return {"enabled": False, "events": []}
+
+    events = []
+    for event in raw_events:
+        start_info = event.get("start", {})
+        end_info = event.get("end", {})
+        private = event.get("extendedProperties", {}).get("private", {})
+        events.append(
+            {
+                "id": event.get("id"),
+                "summary": event.get("summary") or "(Sem título)",
+                "start": start_info.get("dateTime") or start_info.get("date"),
+                "end": end_info.get("dateTime") or end_info.get("date"),
+                "all_day": "date" in start_info,
+                "phone": private.get("phone"),
+                "patient_name": private.get("patient_name"),
+            }
+        )
+
+    return {
+        "enabled": True,
+        "calendar_id": settings.google_calendar_id,
+        "business_hour_start": settings.business_hour_start,
+        "business_hour_end": settings.business_hour_end,
+        "events": events,
     }

@@ -7,6 +7,7 @@ import type { AdminUser } from "../lib/api";
 import Avatar from "./Avatar";
 import {
   IconAgents,
+  IconCalendar,
   IconChats,
   IconDashboard,
   IconLogout,
@@ -18,6 +19,7 @@ import styles from "./AppShell.module.css";
 const NAV_ITEMS = [
   { href: "/dashboard", label: "Dashboard", icon: IconDashboard },
   { href: "/chats", label: "Conversas", icon: IconChats },
+  { href: "/agenda", label: "Agenda", icon: IconCalendar },
   { href: "/agents", label: "Agentes", icon: IconAgents },
 ];
 

@@ -181,6 +181,21 @@ export const IconMic = (p: IconProps = {}) =>
     p,
   );
 
+export const IconCalendar = (p: IconProps = {}) =>
+  base(
+    <>
+      <rect x="3.5" y="4.5" width="17" height="16" rx="2" />
+      <path d="M3.5 9.5h17" />
+      <path d="M8 3v3" />
+      <path d="M16 3v3" />
+    </>,
+    p,
+  );
+
+export const IconChevronLeft = (p: IconProps = {}) => base(<path d="m14.5 5-7 7 7 7" />, p);
+
+export const IconChevronRight = (p: IconProps = {}) => base(<path d="m9.5 5 7 7-7 7" />, p);
+
 export const IconLock = (p: IconProps = {}) =>
   base(
     <>
