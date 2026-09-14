@@ -22,7 +22,10 @@ from langchain.agents import create_agent
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.store.base import BaseStore
 
-from whatsapp_langchain.agents.middleware import get_context_middleware
+from whatsapp_langchain.agents.middleware import (
+    create_greeting_middleware,
+    get_context_middleware,
+)
 from whatsapp_langchain.agents.tools import (
     book_appointment,
     cancel_appointment,
@@ -72,8 +75,9 @@ def build_graph(
     # Modelo principal com rate limiter centralizado (shared/llm.py)
     model = create_chat_model()
 
-    # Middleware de contexto baseado em CONTEXT_STRATEGY
-    middleware = get_context_middleware()
+    # Middleware de contexto baseado em CONTEXT_STRATEGY, mais a saudação
+    # dinâmica (bom dia/tarde/noite) recalculada a cada chamada ao modelo
+    middleware = [*get_context_middleware(), create_greeting_middleware(SYSTEM_PROMPT)]
 
     if enable_memory_tools is None:
         enable_memory_tools = store is not None
