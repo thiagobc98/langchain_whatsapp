@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { Chat } from "../../lib/api";
 import Avatar from "../Avatar";
-import { formatPhone, relativeTime } from "../../lib/format";
+import { formatAgentName, formatPhone, relativeTime } from "../../lib/format";
 import { IconArrowLeft, IconInfo } from "../icons";
 import styles from "./ConversationHeader.module.css";
 
@@ -29,7 +29,7 @@ export default function ConversationHeader({
         <p className={styles.sub}>
           {chat ? (
             <>
-              {chat.agent_id} · última atividade {relativeTime(chat.last_message_at)}
+              {formatAgentName(chat.agent_id)} · última atividade {relativeTime(chat.last_message_at)}
             </>
           ) : (
             "Carregando..."

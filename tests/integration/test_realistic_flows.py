@@ -103,7 +103,7 @@ class TestJornadaNovoUsuario:
     ) -> None:
         """Maria envia 2 mensagens e verificamos todo o pipeline."""
         phone = unique_phone("11")
-        agent = "rhawk_assistant"
+        agent = "secretaria"
 
         # --- Passo 1: Primeira mensagem ---
         print(f"\n{'=' * 60}")
@@ -189,7 +189,7 @@ class TestMemoriaSemantica:
     def test_memoria_persiste_entre_sessoes(self, db_url: str) -> None:
         """João salva um código secreto e recupera sem histórico de conversa."""
         phone = unique_phone("21")
-        thread_id = f"{phone}:rhawk_assistant"
+        thread_id = f"{phone}:secretaria"
         token = f"rhawk-{uuid.uuid4().hex[:8]}"
 
         print(f"\n{'=' * 60}")
@@ -267,7 +267,7 @@ class TestDebounce:
     def test_debounce_agrupa_mensagens_rapidas(self, db_url: str) -> None:
         """3 mensagens rápidas viram 1 entrada na fila."""
         phone = unique_phone("31")
-        agent = "rhawk_assistant"
+        agent = "secretaria"
         messages = ["Oi", "Tudo bem?", "Quero saber sobre LangGraph"]
 
         print(f"\n{'=' * 60}")
@@ -379,7 +379,7 @@ class TestUsuariosSimultaneos:
         # --- Passo 3: Verificar conversations isoladas ---
         print("[3/4] Verificando isolamento de conversations...")
         for phone in results:
-            conv = query_conversation(db_url, phone, "rhawk_assistant")
+            conv = query_conversation(db_url, phone, "secretaria")
             assert conv is not None, f"Conversa de {phone} não encontrada"
             assert conv[0] >= 1, f"message_count de {phone} = {conv[0]}"
             print(f"  ✓ {phone}: message_count = {conv[0]}")
@@ -458,7 +458,7 @@ class TestRateLimiting:
 
         # --- Passo 3: Verificar que mensagens aceitas foram enfileiradas ---
         print(f"[3/3] Verificando que {accepted} mensagens foram enfileiradas...")
-        total = count_queue_entries(db_url, phone, "rhawk_assistant")
+        total = count_queue_entries(db_url, phone, "secretaria")
         # O debounce pode ter agrupado várias, mas deve ter pelo menos 1
         assert total >= 1, "Nenhuma mensagem enfileirada antes do rate limit"
         print(f"  ✓ {total} entrada(s) na fila (debounce pode ter agrupado)")
@@ -544,8 +544,8 @@ class TestConsistenciaAPIAdmin:
         agents_resp = admin_client.get("/api/agents")
         assert agents_resp.status_code == 200
         agents = agents_resp.json()["agents"]
-        assert "rhawk_assistant" in agents, (
-            f"rhawk_assistant não está na lista: {agents}"
+        assert "secretaria" in agents, (
+            f"secretaria não está na lista: {agents}"
         )
         print(f"  ✓ Agentes disponíveis: {agents}")
 

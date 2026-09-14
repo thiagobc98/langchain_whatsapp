@@ -36,7 +36,7 @@ Você verá todos os endpoints documentados com formulários interativos.
 2. Clique em **Try it out**
 3. No campo `token` (path param), digite o mesmo valor de
    `EVOLUTION_WEBHOOK_TOKEN` do seu `.env`
-4. No campo `agent` (query param), digite: `rhawk_assistant`
+4. No campo `agent` (query param), digite: `secretaria`
 5. No corpo (JSON), preencha:
 
 ```json
@@ -153,7 +153,7 @@ Depois verifique:
 ```sql
 -- Quantas entradas na fila? Se o debounce funcionou, deve ser 1 (não 3)
 SELECT COUNT(*) FROM message_queue
-WHERE phone_number = '+5511999990002' AND agent_id = 'rhawk_assistant';
+WHERE phone_number = '+5511999990002' AND agent_id = 'secretaria';
 
 -- O texto ficou concatenado?
 SELECT incoming_message FROM message_queue
@@ -196,8 +196,8 @@ WHERE prefix = '+5511999990003.memories';
 Limpe os checkpoints para simular uma nova sessão:
 
 ```sql
-DELETE FROM checkpoint_writes WHERE thread_id = '+5511999990003:rhawk_assistant';
-DELETE FROM checkpoints WHERE thread_id = '+5511999990003:rhawk_assistant';
+DELETE FROM checkpoint_writes WHERE thread_id = '+5511999990003:secretaria';
+DELETE FROM checkpoints WHERE thread_id = '+5511999990003:secretaria';
 ```
 
 Envie nova mensagem pedindo recall:
@@ -223,7 +223,7 @@ Sem sair do Swagger, teste os endpoints admin:
 
 | Endpoint | O que mostra |
 |---|---|
-| `GET /api/agents` | Agentes disponíveis (`rhawk_assistant`) |
+| `GET /api/agents` | Agentes disponíveis (`secretaria`) |
 | `GET /api/chats` | Lista de conversas com `message_count` |
 | `GET /api/chats/+5511999990001` | Mensagens de um telefone específico |
 | `GET /api/metrics` | `total_today`, `queue_size`, `failures_today` |

@@ -23,7 +23,7 @@ Define o pacote Python `whatsapp-langchain` (build via `hatchling`, código em `
 Lockfile gerado pelo `uv` (gerenciador de pacotes Python) — trava versões exatas de todas as dependências transitivas para builds reprodutíveis.
 
 ### `langgraph.json`
-Manifesto usado pelo `langgraph dev` (LangGraph Studio/CLI). Registra o grafo `rhawk_assistant` apontando para `graph.py:graph` e carrega variáveis de `.env`. É o que permite abrir o Studio local para depurar o agente isoladamente, sem subir API/Worker.
+Manifesto usado pelo `langgraph dev` (LangGraph Studio/CLI). Registra o grafo `secretaria` apontando para `graph.py:graph` e carrega variáveis de `.env`. É o que permite abrir o Studio local para depurar o agente isoladamente, sem subir API/Worker.
 
 ### `Makefile`
 Ponto de entrada de todos os comandos operacionais do projeto (`make help` lista tudo). Grupos principais:
@@ -136,16 +136,16 @@ Client Redis assíncrono singleton (mesmo padrão de `shared/db.py`: `get_redis(
 #### `agents/loader.py`
 Carregador **dinâmico** de agentes por `agent_id`. `load_graph(agent_id, checkpointer, store)` importa `agents.catalog.{agent_id}.agent` via `importlib` e chama sua função `build_graph()`. `list_agents()` escaneia `agents/catalog/` por diretórios com um `agent.py` válido — é o que alimenta `GET /api/agents` e a validação de `agent` no webhook. Levanta `AgentNotFoundError` (tratado globalmente em `server/main.py` como HTTP 400) se o agente não existir.
 
-#### `agents/catalog/rhawk_assistant/agent.py`
-Define `build_graph()`, a factory do agente **rhawk_assistant** usando `create_agent` do LangChain 1.x. Monta: modelo principal (`create_chat_model()`), middleware de contexto conforme `CONTEXT_STRATEGY` (`get_context_middleware()`), tools de memória (`save_memory`/`read_memory`, habilitadas automaticamente se houver `store`), system prompt (`prompts.py`), e os objetos `checkpointer`/`store` recebidos por parâmetro (injetados pela API/Worker em produção, `None` em testes/dev simples).
+#### `agents/catalog/secretaria/agent.py`
+Define `build_graph()`, a factory do agente **secretaria** usando `create_agent` do LangChain 1.x. Monta: modelo principal (`create_chat_model()`), middleware de contexto conforme `CONTEXT_STRATEGY` (`get_context_middleware()`), tools de memória (`save_memory`/`read_memory`, habilitadas automaticamente se houver `store`), system prompt (`prompts.py`), e os objetos `checkpointer`/`store` recebidos por parâmetro (injetados pela API/Worker em produção, `None` em testes/dev simples).
 
-#### `agents/catalog/rhawk_assistant/graph.py`
+#### `agents/catalog/secretaria/graph.py`
 Exporta a variável `graph` exigida pelo `langgraph dev`/`langgraph.json`. Chama `build_graph(enable_memory_tools=True)` **sem** checkpointer/store customizados, porque a plataforma LangGraph Studio injeta os seus próprios automaticamente — passar um store customizado seria rejeitado no carregamento.
 
-#### `agents/catalog/rhawk_assistant/prompts.py`
+#### `agents/catalog/secretaria/prompts.py`
 Contém `SYSTEM_PROMPT`: a persona do assistente da comunidade "Top Hawks" — diretrizes de tom (português, direto, respostas curtas para WhatsApp) e instruções explícitas de quando usar `save_memory`/`read_memory`.
 
-#### `agents/catalog/rhawk_assistant/__init__.py`, `agents/catalog/__init__.py`, `agents/__init__.py`
+#### `agents/catalog/secretaria/__init__.py`, `agents/catalog/__init__.py`, `agents/__init__.py`
 Marcadores de pacote Python; `agents/catalog/__init__.py` mantém o diretório `catalog/` importável (necessário para o `importlib.import_module` do loader funcionar).
 
 #### `agents/middleware/context.py`
@@ -400,7 +400,7 @@ Script bash (`make backup`) que roda `pg_dump` **dentro do container** `db` via 
 
 1. **Webhook** (`server/routes/webhook.py`) recebe o POST do Twilio, valida assinatura (`server/dependencies.py`), aplica rate limit (Redis) e chama `enqueue_or_buffer` (`shared/queue.py`) — que insere ou concatena (debounce) uma linha em `message_queue`. Responde 200 imediatamente.
 2. **Worker** (`worker/main.py`) faz polling contínuo via `claim_next` (`shared/queue.py`), que reserva atomicamente a próxima mensagem elegível.
-3. `worker/processor.py` orquestra: pré-processa mídia (`worker/media.py`, chamando OpenRouter multimodal se necessário), envia typing (`worker/twilio_client.py`), carrega o agente (`agents/loader.py` → `agents/catalog/rhawk_assistant/agent.py`) com o `checkpointer`/`store` abertos no boot do Worker, invoca o grafo (aplica middleware de contexto e pode chamar as tools de memória), e envia a resposta via Twilio.
+3. `worker/processor.py` orquestra: pré-processa mídia (`worker/media.py`, chamando OpenRouter multimodal se necessário), envia typing (`worker/twilio_client.py`), carrega o agente (`agents/loader.py` → `agents/catalog/secretaria/agent.py`) com o `checkpointer`/`store` abertos no boot do Worker, invoca o grafo (aplica middleware de contexto e pode chamar as tools de memória), e envia a resposta via Twilio.
 4. Só após confirmação de envio, `mark_done`/`upsert_conversation` (`shared/queue.py`) persistem o resultado — alimentando as tabelas que o **Admin Panel** (`frontend/`) consulta via `server/routes/admin.py`.
 5. Em qualquer falha no meio do caminho, `mark_failed` decide entre reagendar (retry com backoff) ou marcar como `failed` definitivamente.
 

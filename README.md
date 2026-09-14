@@ -102,7 +102,7 @@ curl http://localhost:8000/health
 ### 4. Teste rápido (endpoint síncrono)
 
 ```bash
-curl -X POST "http://localhost:8000/webhook/sync?agent=rhawk_assistant" \
+curl -X POST "http://localhost:8000/webhook/sync?agent=secretaria" \
   -H "Content-Type: application/json" \
   -d '{"phone":"+5511999999999","message":"Olá!"}'
 ```
@@ -110,7 +110,7 @@ curl -X POST "http://localhost:8000/webhook/sync?agent=rhawk_assistant" \
 ### 5. Teste assíncrono (simulando Evolution API)
 
 ```bash
-curl -X POST "http://localhost:8000/webhook/evolution/SEU_TOKEN?agent=rhawk_assistant" \
+curl -X POST "http://localhost:8000/webhook/evolution/SEU_TOKEN?agent=secretaria" \
   -H "Content-Type: application/json" \
   -d '{
     "event": "messages.upsert",

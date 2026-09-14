@@ -145,7 +145,7 @@ class TestWebhookEvolution:
     def test_rejects_wrong_token(self):
         """Deve rejeitar com 403 quando o token do path não confere."""
         response = client.post(
-            "/webhook/evolution/token-errado?agent=rhawk_assistant",
+            "/webhook/evolution/token-errado?agent=secretaria",
             json=_message_payload(),
         )
         assert response.status_code == 403
@@ -158,7 +158,7 @@ class TestWebhookEvolution:
         mock_enqueue.return_value = EnqueueResult(message_id=1, is_buffered=False)
 
         response = client.post(
-            f"/webhook/evolution/{WEBHOOK_TOKEN}?agent=rhawk_assistant",
+            f"/webhook/evolution/{WEBHOOK_TOKEN}?agent=secretaria",
             json=_message_payload(),
         )
         assert response.status_code == 200
@@ -173,7 +173,7 @@ class TestWebhookEvolution:
         payload["data"]["key"]["remoteJid"] = "120363000000000000@g.us"
 
         response = client.post(
-            f"/webhook/evolution/{WEBHOOK_TOKEN}?agent=rhawk_assistant",
+            f"/webhook/evolution/{WEBHOOK_TOKEN}?agent=secretaria",
             json=payload,
         )
         assert response.status_code == 200
@@ -187,7 +187,7 @@ class TestWebhookEvolution:
         payload["data"]["key"]["fromMe"] = True
 
         response = client.post(
-            f"/webhook/evolution/{WEBHOOK_TOKEN}?agent=rhawk_assistant",
+            f"/webhook/evolution/{WEBHOOK_TOKEN}?agent=secretaria",
             json=payload,
         )
         assert response.status_code == 200
@@ -198,7 +198,7 @@ class TestWebhookEvolution:
     def test_ignores_non_message_events(self, mock_enqueue):
         """Eventos que não são messages.upsert são ignorados."""
         response = client.post(
-            f"/webhook/evolution/{WEBHOOK_TOKEN}?agent=rhawk_assistant",
+            f"/webhook/evolution/{WEBHOOK_TOKEN}?agent=secretaria",
             json={"event": "connection.update", "data": {}},
         )
         assert response.status_code == 200
@@ -220,4 +220,4 @@ class TestAdminRoutes:
         assert response.status_code == 200
         data = response.json()
         assert "agents" in data
-        assert "rhawk_assistant" in data["agents"]
+        assert "secretaria" in data["agents"]

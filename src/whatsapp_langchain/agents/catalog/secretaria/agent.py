@@ -1,4 +1,4 @@
-"""Agente rhawk_assistant - assistente da comunidade Top Hawks.
+"""Agente secretaria - assistente da comunidade Top Hawks.
 
 Agente simples usando create_agent do LangChain 1.0.
 Usa middleware de contexto configurável (trim ou summarize)
@@ -44,7 +44,7 @@ def build_graph(
     store: BaseStore | None = None,
     enable_memory_tools: bool | None = None,
 ):
-    """Constrói o agente rhawk_assistant.
+    """Constrói o agente secretaria.
 
     O agente usa middleware de contexto configurável via CONTEXT_STRATEGY:
     - trim: Remove mensagens antigas (custo zero, perde contexto)

@@ -50,7 +50,7 @@ def _make_tool_runtime(user_id: str) -> MagicMock:
     runtime.config = {
         "configurable": {
             "user_id": user_id,
-            "thread_id": f"{user_id}:rhawk_assistant",
+            "thread_id": f"{user_id}:secretaria",
         }
     }
     return runtime
@@ -200,7 +200,7 @@ def test_demo_webhook_memory_recall_e2e(ensure_docker_stack: str):
     4) Resposta final deve conter o fato salvo.
     """
     phone = f"+5531{uuid.uuid4().int % 10**8:08d}"
-    thread_id = f"{phone}:rhawk_assistant"
+    thread_id = f"{phone}:secretaria"
     token = f"rhawk-{uuid.uuid4().hex[:10]}"
 
     sid_save = f"MSGMEM{uuid.uuid4().hex[:12]}"

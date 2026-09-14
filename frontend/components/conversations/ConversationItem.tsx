@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { Chat } from "../../lib/api";
 import Avatar from "../Avatar";
-import { formatPhone, relativeTime } from "../../lib/format";
+import { formatAgentName, formatPhone, relativeTime } from "../../lib/format";
 import styles from "./ConversationItem.module.css";
 
 export default function ConversationItem({
@@ -24,7 +24,7 @@ export default function ConversationItem({
         </div>
         <div className={styles.row}>
           <span className={styles.preview}>{chat.last_message ?? "Sem mensagens"}</span>
-          <span className={styles.agentTag}>{chat.agent_id}</span>
+          <span className={styles.agentTag}>{formatAgentName(chat.agent_id)}</span>
         </div>
       </div>
     </Link>

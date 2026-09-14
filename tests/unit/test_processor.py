@@ -25,8 +25,8 @@ def message():
         id=1,
         message_id="MSG123",
         phone_number="+5511999999999",
-        agent_id="rhawk_assistant",
-        thread_id="+5511999999999:rhawk_assistant",
+        agent_id="secretaria",
+        thread_id="+5511999999999:secretaria",
         incoming_message="Olá!",
     )
 
@@ -38,8 +38,8 @@ def media_message():
         id=2,
         message_id="MSG456",
         phone_number="+5511999999999",
-        agent_id="rhawk_assistant",
-        thread_id="+5511999999999:rhawk_assistant",
+        agent_id="secretaria",
+        thread_id="+5511999999999:secretaria",
         incoming_message="",
         media_base64="aGVsbG8=",
         media_type="image/jpeg",

@@ -275,7 +275,7 @@ def get_evolution_webhook_token() -> str:
 def send_webhook(
     phone: str,
     body: str,
-    agent: str = "rhawk_assistant",
+    agent: str = "secretaria",
     message_sid: str | None = None,
     media_base64: str | None = None,
     media_type: str | None = None,
@@ -320,7 +320,7 @@ def send_webhook_and_wait(
     db_url: str,
     phone: str,
     body: str,
-    agent: str = "rhawk_assistant",
+    agent: str = "secretaria",
     timeout_seconds: int = 90,
 ) -> tuple[str, tuple]:
     """Envia webhook e aguarda status terminal. Retorna (sid, row)."""

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { api } from "../../../lib/api";
+import { formatAgentName } from "../../../lib/format";
 import { IconAgents } from "../../../components/icons";
 import EmptyState from "../../../components/EmptyState";
 import styles from "./page.module.css";
@@ -40,7 +41,7 @@ export default function AgentsPage() {
                 <IconAgents size={20} />
               </div>
               <div>
-                <p className={styles.agentId}>{agentId}</p>
+                <p className={styles.agentId}>{formatAgentName(agentId)}</p>
                 <p className={styles.agentSub}>Agente ativo no catálogo</p>
               </div>
             </div>

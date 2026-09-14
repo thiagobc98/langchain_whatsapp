@@ -10,7 +10,7 @@ do grafo. As tools de memória continuam habilitadas; elas resolvem o store
 via InjectedStore em runtime, usando o store que a plataforma injeta.
 """
 
-from whatsapp_langchain.agents.catalog.rhawk_assistant.agent import build_graph
+from whatsapp_langchain.agents.catalog.secretaria.agent import build_graph
 
 # Grafo compilado para langgraph dev — sem checkpointer/store customizados,
 # a plataforma injeta os seus automaticamente.

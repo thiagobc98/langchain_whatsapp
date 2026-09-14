@@ -1,6 +1,6 @@
 import type { Chat } from "../../lib/api";
 import Avatar from "../Avatar";
-import { formatDateTime, formatPhone, relativeTime } from "../../lib/format";
+import { formatAgentName, formatDateTime, formatPhone, relativeTime } from "../../lib/format";
 import { IconX } from "../icons";
 import styles from "./CustomerPanel.module.css";
 
@@ -39,7 +39,7 @@ export default function CustomerPanel({
             <dl className={styles.list}>
               <div className={styles.row}>
                 <dt>Agente</dt>
-                <dd>{chat.agent_id}</dd>
+                <dd>{formatAgentName(chat.agent_id)}</dd>
               </div>
               <div className={styles.row}>
                 <dt>Thread</dt>

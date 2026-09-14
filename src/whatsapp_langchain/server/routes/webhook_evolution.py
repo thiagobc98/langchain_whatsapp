@@ -12,7 +12,7 @@ a URL no Evolution Manager como:
     https://seu-dominio/webhook/evolution/{EVOLUTION_WEBHOOK_TOKEN}?agent=...
 
 Uso:
-    curl -X POST ".../webhook/evolution/SEU_TOKEN?agent=rhawk_assistant" \
+    curl -X POST ".../webhook/evolution/SEU_TOKEN?agent=secretaria" \
          -H "Content-Type: application/json" \
          -d '{"event":"messages.upsert","data":{...}}'
 """

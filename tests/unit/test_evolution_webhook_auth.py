@@ -101,7 +101,7 @@ class TestWebhookRouteTokenValidation:
         mock_enqueue.return_value = EnqueueResult(message_id=1, is_buffered=False)
 
         response = client.post(
-            f"/webhook/evolution/{VALID_TOKEN}?agent=rhawk_assistant",
+            f"/webhook/evolution/{VALID_TOKEN}?agent=secretaria",
             json=MESSAGE_PAYLOAD,
         )
         assert response.status_code == 200
@@ -112,7 +112,7 @@ class TestWebhookRouteTokenValidation:
         monkeypatch.setattr(settings, "evolution_webhook_token", VALID_TOKEN)
 
         response = client.post(
-            "/webhook/evolution/token-errado?agent=rhawk_assistant",
+            "/webhook/evolution/token-errado?agent=secretaria",
             json=MESSAGE_PAYLOAD,
         )
         assert response.status_code == 403
@@ -123,7 +123,7 @@ class TestWebhookRouteTokenValidation:
         monkeypatch.setattr(settings, "evolution_webhook_token", "")
 
         response = client.post(
-            f"/webhook/evolution/{VALID_TOKEN}?agent=rhawk_assistant",
+            f"/webhook/evolution/{VALID_TOKEN}?agent=secretaria",
             json=MESSAGE_PAYLOAD,
         )
         assert response.status_code == 500

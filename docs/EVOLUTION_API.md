@@ -11,7 +11,7 @@ Usuário WhatsApp
        │
        ▼
 Evolution API (sua VPS)
-       │  POST /webhook/evolution/{token}?agent=rhawk_assistant
+       │  POST /webhook/evolution/{token}?agent=secretaria
        │  (sem assinatura — token secreto no path)
        ▼
 cloudflared tunnel ──► API (localhost:8000)
@@ -88,7 +88,7 @@ INF +----------------------------+
 
 No Evolution Manager, na sua instância → **Webhook**:
 
-- **URL**: `https://random-name.trycloudflare.com/webhook/evolution/SEU_EVOLUTION_WEBHOOK_TOKEN?agent=rhawk_assistant`
+- **URL**: `https://random-name.trycloudflare.com/webhook/evolution/SEU_EVOLUTION_WEBHOOK_TOKEN?agent=secretaria`
 - **Eventos**: habilite pelo menos `MESSAGES_UPSERT`
 - **Webhook Base64**: **habilite** (`webhookBase64=true`) — o worker espera
   receber imagem/áudio já em base64 dentro do próprio webhook, sem precisar
@@ -102,7 +102,7 @@ curl -X POST "https://evo.seudominio.com/webhook/set/minha-instancia" \
   -H "Content-Type: application/json" \
   -d '{
     "webhook": {
-      "url": "https://random-name.trycloudflare.com/webhook/evolution/SEU_EVOLUTION_WEBHOOK_TOKEN?agent=rhawk_assistant",
+      "url": "https://random-name.trycloudflare.com/webhook/evolution/SEU_EVOLUTION_WEBHOOK_TOKEN?agent=secretaria",
       "enabled": true,
       "webhookBase64": true,
       "events": ["MESSAGES_UPSERT"]
@@ -122,7 +122,7 @@ curl -X POST "https://evo.seudominio.com/webhook/set/minha-instancia" \
 ### 5.1 Fluxo simulado (sem Evolution real)
 
 ```bash
-curl -X POST "http://localhost:8000/webhook/evolution/SEU_EVOLUTION_WEBHOOK_TOKEN?agent=rhawk_assistant" \
+curl -X POST "http://localhost:8000/webhook/evolution/SEU_EVOLUTION_WEBHOOK_TOKEN?agent=secretaria" \
   -H "Content-Type: application/json" \
   -d '{
     "event": "messages.upsert",

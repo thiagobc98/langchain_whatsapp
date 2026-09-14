@@ -18,6 +18,14 @@ export function formatPhone(raw: string): string {
   return `+${digits}`;
 }
 
+const AGENT_DISPLAY_NAMES: Record<string, string> = {
+  secretaria: "Secretária",
+};
+
+export function formatAgentName(agentId: string): string {
+  return AGENT_DISPLAY_NAMES[agentId] ?? agentId;
+}
+
 const AVATAR_HUES = [142, 160, 174, 190, 204, 260, 280];
 
 export function avatarHue(raw: string): number {

@@ -41,12 +41,12 @@ make dev
 # abre o LangGraph Studio
 ```
 
-O grafo padrão é `rhawk_assistant`, registrado em `langgraph.json`.
+O grafo padrão é `secretaria`, registrado em `langgraph.json`.
 
 Arquivos centrais do agente:
-- `src/whatsapp_langchain/agents/catalog/rhawk_assistant/agent.py`
-- `src/whatsapp_langchain/agents/catalog/rhawk_assistant/prompts.py`
-- `src/whatsapp_langchain/agents/catalog/rhawk_assistant/graph.py`
+- `src/whatsapp_langchain/agents/catalog/secretaria/agent.py`
+- `src/whatsapp_langchain/agents/catalog/secretaria/prompts.py`
+- `src/whatsapp_langchain/agents/catalog/secretaria/graph.py`
 
 ## 3. Trilha B: stack completo da Fase 2
 
@@ -86,7 +86,7 @@ make logs
 ### 4.1 Endpoint síncrono (didático)
 
 ```bash
-curl -X POST "http://localhost:8000/webhook/sync?agent=rhawk_assistant" \
+curl -X POST "http://localhost:8000/webhook/sync?agent=secretaria" \
   -H "Content-Type: application/json" \
   -d '{"phone":"+5511999999999","message":"Me explique debounce"}'
 ```
@@ -96,7 +96,7 @@ Use para debugging rápido sem fila.
 ### 4.2 Webhook assíncrono (arquitetura real)
 
 ```bash
-curl -X POST "http://localhost:8000/webhook/evolution/SEU_TOKEN?agent=rhawk_assistant" \
+curl -X POST "http://localhost:8000/webhook/evolution/SEU_TOKEN?agent=secretaria" \
   -H "Content-Type: application/json" \
   -d '{
     "event": "messages.upsert",
@@ -120,11 +120,11 @@ curl http://localhost:8000/api/chats/+5511999999999
 ### 4.2.1 Teste manual no Swagger (`/docs`)
 
 1. Abra `http://localhost:8000/docs`.
-2. Execute `GET /api/agents` e confirme `rhawk_assistant`.
+2. Execute `GET /api/agents` e confirme `secretaria`.
 3. Abra `POST /webhook/evolution/{token}` e clique em `Try it out`.
 4. Preencha:
    - `token` (path): o mesmo valor de `EVOLUTION_WEBHOOK_TOKEN` no `.env`
-   - `agent` (query): `rhawk_assistant`
+   - `agent` (query): `secretaria`
    - body: o JSON de exemplo da seção 4.2, trocando o texto da mensagem
 5. Execute e verifique:
    - resposta `200` com `{"received": true}`
@@ -135,7 +135,7 @@ curl http://localhost:8000/api/chats/+5511999999999
 1. Envie uma mensagem pedindo para salvar um fato:
 
 ```bash
-curl -X POST "http://localhost:8000/webhook/evolution/SEU_TOKEN?agent=rhawk_assistant" \
+curl -X POST "http://localhost:8000/webhook/evolution/SEU_TOKEN?agent=secretaria" \
   -H "Content-Type: application/json" \
   -d '{
     "event": "messages.upsert",
@@ -151,7 +151,7 @@ curl -X POST "http://localhost:8000/webhook/evolution/SEU_TOKEN?agent=rhawk_assi
 2. Envie outra mensagem pedindo recall explícito:
 
 ```bash
-curl -X POST "http://localhost:8000/webhook/evolution/SEU_TOKEN?agent=rhawk_assistant" \
+curl -X POST "http://localhost:8000/webhook/evolution/SEU_TOKEN?agent=secretaria" \
   -H "Content-Type: application/json" \
   -d '{
     "event": "messages.upsert",

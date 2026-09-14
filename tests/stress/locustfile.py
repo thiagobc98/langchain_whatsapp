@@ -22,7 +22,7 @@ import uuid
 
 from locust import HttpUser, between, task
 
-AGENT_ID = os.getenv("LOCUST_AGENT_ID", "rhawk_assistant")
+AGENT_ID = os.getenv("LOCUST_AGENT_ID", "secretaria")
 WEBHOOK_TOKEN = os.getenv(
     "LOCUST_WEBHOOK_TOKEN", os.getenv("EVOLUTION_WEBHOOK_TOKEN", "")
 )
