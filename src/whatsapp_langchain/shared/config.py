@@ -132,6 +132,17 @@ class Settings(BaseSettings):
     business_hour_end: int = 18
     appointment_duration_minutes: int = 30
 
+    # --- Notificações proativas (fora do ciclo normal de webhook) ---
+    # WhatsApp da médica (E.164) para receber a agenda do dia seguinte a
+    # cada agendamento/remarcação/cancelamento. Vazio desabilita o aviso.
+    doctor_whatsapp_number: str = ""
+    # Hora (0-23, fuso business_timezone) em que os pacientes com consulta
+    # no dia seguinte recebem o lembrete de confirmação.
+    patient_reminder_hour: int = 9
+    # Hora (0-23, fuso business_timezone) em que a médica recebe o resumo
+    # fixo com a agenda do dia seguinte.
+    doctor_summary_hour: int = 20
+
 
 # Singleton — importar de qualquer lugar do projeto
 settings = Settings()
